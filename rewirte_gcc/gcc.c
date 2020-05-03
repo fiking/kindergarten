@@ -4,12 +4,15 @@
 #include <stdlib.h>
 #include <string.h>
 #include "obstack.h"
+#include "config.h"
 
 #define obstack_chunk_alloc xmalloc
 
 #define SWITCH_TAKES_ARG(CHAR)      \
   (CHAR == 'D' || CHAR == 'U' || CHAR == 'o' || CHAR == 'e' || CHAR == 'T'  \
    || CHAR == 'u' || CHAR == 'I' || CHAR == 'Y' || CHAR == 'd' || CHAR == 'm')
+
+#define MIN_FATAL_STATUS 32
 
 int argbuf_length;
 char **argbuf;
@@ -26,7 +29,6 @@ char **outfiles;
 char **switches;
 int n_switches;
 
-char *user_exec_prefix = 0;
 unsigned char vflag;
 
 char *input_filename;
@@ -40,6 +42,13 @@ int argbuf_index;
 int arg_going;
 int delete_this_arg;
 int this_is_output_file;
+
+/* User-specified prefix to attach to command names,
+   or 0 if none specified.  */
+char *user_exec_prefix = 0;
+/* Default prefixes to attach to command names.  */
+char *standard_exec_prefix = "/usr/local/lib/gcc-";
+char *standard_exec_prefix_1 = "/usr/lib/gcc-";
 
 /* This structure says how to run one compiler, and when to do so.  */
 struct compiler
@@ -71,6 +80,15 @@ struct compiler compilers[] =
   {0, 0}
 };
 
+int do_spec_1 ();
+
+void
+record_temp_file (filename)
+    char *filename;
+{
+  /* Todo: write later */
+  return;
+}
 
 void 
 delete_temp_files ()
@@ -210,15 +228,361 @@ process_command (argc, argv)
   infiles[n_infiles] = 0;
 }
 
+char *
+save_string (s, len)
+    char *s;
+	int len;
+{
+  char *result = (char *) xmalloc (len + 1);
+  bcopy (s, result, len);
+  result[len] = 0;
+  return result;
+}
+
 void 
 clear_args ()
 {
   argbuf_index = 0;
 }
 
+void
+store_arg (arg, tempnamep)
+    char *arg;
+	int tempnamep;
+{
+  if (argbuf_index + 1 == argbuf_length) {
+    argbuf = (char **) realloc (argbuf, (argbuf_length *= 2) * sizeof(char *));
+  }
+  argbuf[argbuf_index++] = arg;
+  argbuf[argbuf_index] = 0;
+  if (tempnamep) {
+    record_temp_file (arg);
+  }
+}
+
+void 
+pfatal_with_name (name)
+    char *name;
+{
+  char *s;
+  s = "cannot open %s";
+  fatal (s, name);
+  //Todo: write later
+}
+
+void
+perror_with_name (name)
+    char *name;
+{
+  char *s;
+  s = "cannot open %s";
+  error (s, name);
+}
+
+/* Execute the command specified by the arguments on the current line of spec.
+   Returns 0 if successful, -1 if failed.  */
+int
+execute ()
+{
+  int pid;
+  union wait status;
+  int size;
+  char *temp;
+  int win = 0;
+  
+  size = strlen (standard_exec_prefix);
+  if (user_exec_prefix != 0 && strlen (user_exec_prefix) > size) {
+    size = strlen (user_exec_prefix);
+  }
+  if (strlen (standard_exec_prefix_1) > size) {
+    size = strlen (standard_exec_prefix_1);
+  }
+  size += strlen (argbuf[0]) + 1;
+  temp = (char *) alloca (size);
+
+  /* Determine the filename to execute.  */
+  if (user_exec_prefix) {
+    strcpy (temp, user_exec_prefix);
+	strcat (temp, argbuf[0]);
+	win = (access (temp, X_OK) == 0);
+  }
+
+  if (!win) {
+    strcpy (temp, standard_exec_prefix);
+	strcat (temp, argbuf[0]);
+	win = (access (temp, X_OK) == 0);
+  }
+
+  if (!win) {
+    strcpy (temp, standard_exec_prefix_1);
+	strcat (temp, argbuf[0]);
+	win = (access (temp, X_OK) == 0);
+  }
+
+  if (vflag) {
+    int i;
+	for (i = 0; argbuf[i]; i++) {
+	  if (i == 0 && win) {
+	    fprintf (stderr, " %s", temp);
+	  } else {
+	    fprintf (stderr, " %s", argbuf[i]);
+	  }
+	}
+
+	fprintf (stderr, "\n");
+#ifdef DEBUG
+    fprintf (stderr, "\nGo ahead? (y or n) ");
+	fflush (stderr);
+	i = getchar ();
+	if (i != '\n') {
+	  while (getchar () != '\n') ;
+	  if (i != 'y' && i != 'Y') {
+	    return;
+	  }
+	}
+#endif  /* DEBUG */
+  }
+
+  pid = vfork ();
+  if (pid < 0) {
+    pfatal_with_name ("vfork");
+  }
+
+  if (pid == 0) {
+    if (win) {
+	  execv (temp, argbuf);
+	} else {
+	  execvp (argbuf[0], argbuf);
+	}
+
+	perror_with_name (argbuf[0]);
+	_exit (65);
+  }
+
+  wait (&status);
+  if (WIFSIGNALED (status)) {
+    fatal ("Program %s got fatal signal %d.", argbuf[0], status.w_termsig);
+  }
+
+  if ((WIFEXITED (status) && status.w_retcode >= MIN_FATAL_STATUS)
+      || WIFSIGNALED (status)) {
+    return -1;
+  }
+  return 0;
+}
+
+/* Return 0 if we call do_spec_1 and that returns -1.  */
+char *
+handle_braces (p)
+    char *p;
+{
+  char *q;
+  int negate = *p == '!';
+  char *filter;
+
+  if (negate) {
+    ++p;
+  }
+  
+  filter = p;
+  while (*p != ':' && *p != '}') {
+    p++;
+  }
+
+  if (*p != '}') {
+    int count = 1;
+	q = p + 1;
+	while (count > 0) {
+	  if (*q == '{') {
+	    count++;
+	  } else if (*q == '}') {
+	    count--;
+	  } else if (*q == 0) {
+	    abort ();
+	  }
+	  q++;
+	}
+  } else {
+    q = p + 1;
+  }
+
+  if (p[-1] == '*') {
+    /* Substitute all matching switches as separate args.  */
+	int i;
+	--p;
+	for (i = 0; i < n_switches; i++) {
+	  if (!strncmp (switches[i], filter, p - filter)) {
+	    if (give_switch (i) < 0) {
+		  return 0;
+		}
+	  }
+	}
+  } else {
+    /* Test for presence of the specified switch.  */
+	int i;
+	int present = 0;
+	for (i = 0; i < n_switches; i++) {
+	  if (!strncmp (switches[i], filter, p - filter)) {
+	    present = 1;
+		break;
+	  }
+	}
+
+	/* If it is as desired (present for %{s...}, absent for %{-s...})
+	   then substitute either the switch or the specified
+	   conditional text.  */
+    if (present != negate) {
+	  if (*p == '}') {
+	    if (give_switch (i) < 0) {
+		  return 0;
+		}
+	  } else {
+	    if (do_spec_1 (save_string (p + 1, q - p - 2), 0) < 0) {
+		  return 0;
+		}
+	  }
+	}
+  }
+  return q;
+}
+
+int
+give_switch (switchnum)
+    int switchnum;
+{
+  do_spec_1 ("-", 0);
+  do_spec_1 (switches[switchnum], 0);
+  do_spec_1 (" ", 0);
+}
+
+int
+do_spec_1 (spec, nopercent)
+    char *spec;
+	int nopercent;
+{
+  char *p = spec;
+  int c;
+  char *string;
+
+  while (c = *p++) {
+    switch (c) {
+	  case '\n':
+	  /* End of line: finish any pending argument,
+	     then run the pending command if one has been started.  */
+	    if (arg_going) {
+		  obstack_1grow (&obstack, 0);
+		  string = obstack_finish (&obstack);
+		  store_arg (string, delete_this_arg);
+		  if (this_is_output_file) {
+		    outfiles[input_file_number] = string;
+		  }
+		}
+		arg_going = 0;
+		if (argbuf_index) {
+		  int value = execute ();
+		  if (value) {
+		    return value;
+		  }
+		}
+		/* Reinitialize for a new command, and for a new argument.  */
+		clear_args ();
+		arg_going = 0;
+		delete_this_arg = 0;
+		this_is_output_file = 0;
+		break;
+
+      case '\t':
+	  case ' ':
+	  /* Space or tab ends an argument if one is pending.  */
+	    if (arg_going) {
+		  obstack_1grow (&obstack, 0);
+		  string = obstack_finish (&obstack);
+		  store_arg (string, delete_this_arg);
+		  if (this_is_output_file) {
+		    outfiles[input_file_number] = string;
+		  }
+		}
+		/* Reinitialize for a new argument.  */
+		arg_going = 0;
+		delete_this_arg = 0;
+		this_is_output_file = 0;
+	    break;
+
+      case '%':
+        if (! nopercent) {
+		  switch (c = *p++) {
+		    case 0:
+			  fatal ("Invalid specification!  Bug in cc.");
+
+			case 'i':
+			  obstack_grow (&obstack, input_filename, input_filename_length);
+			  arg_going = 1;
+			  break;
+
+			case 'b':
+			  obstack_grow (&obstack, input_basename, basename_length);
+			  arg_going = 1;
+			  break;
+
+			case 'p':
+			  do_spec_1 (CPP_PREDEFINES, 1);
+			  break;
+
+			case 'g':
+			  obstack_grow (&obstack, temp_filename, temp_filename_length);
+			  delete_this_arg = 1;
+			  arg_going = 1;
+			  break;
+
+	        case 'd':
+			  delete_this_arg = 1;
+			  break;
+
+			case 'w':
+			  this_is_output_file = 1;
+			  break;
+
+			case 'o': {
+			  int f;
+			  for (f = 0; f < n_infiles; f++) {
+			    store_arg (outfiles[f], 0);
+			  }
+			  break;
+			}
+
+			case '{':
+			  p = handle_braces (p);
+			  if (p == 0) {
+			    return -1;
+			  }
+			  break;
+
+			case '%':
+			  obstack_1grow (&obstack, '%');
+			  break;
+
+			default:
+			  abort ();
+		  }
+		} else {
+		  obstack_1grow (&obstack, c);
+		  arg_going = 1;
+		}
+		break;
+
+	  default:
+	    obstack_1grow (&obstack, c);
+		arg_going = 1;
+	    break;
+	}
+  }
+
+  return 0;  /* End of string */
+}
+
 int
 do_spec (spec)
-    char spec;
+    char *spec;
 {
   int value;
   clear_args ();
