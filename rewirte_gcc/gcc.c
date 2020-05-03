@@ -86,6 +86,7 @@ char *link_spec = "%{!c:%{!E:%{!S:ld %{o*}\
 	/lib/crt0.o %o %{g:-lg} -lc\n }}}";
 
 int do_spec_1 ();
+int give_switch ();
 
 void
 record_temp_file (filename)
