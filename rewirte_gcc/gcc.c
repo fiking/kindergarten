@@ -80,6 +80,11 @@ struct compiler compilers[] =
   {0, 0}
 };
 
+/* Here is the spec for running the linker, after compiling all files.  */
+char *link_spec = "%{!c:%{!E:%{!S:ld %{o*}\
+    %{A} %{d} %{e*} %{M} %{N} %{n} %{r} %{s} %{S} %{T*} %{t} %{u*} %{X} %{x} %{z}\
+	/lib/crt0.o %o %{g:-lg} -lc\n }}}";
+
 int do_spec_1 ();
 
 void
@@ -656,5 +661,11 @@ main (argc, argv)
   }
 
   /* Run ld to link all the compiler output files.  */
+  if (! nolink) {
+    do_spec (link_spec);
+  }
+
+  /* Delete all the temporary files we made.  */
+  delete_temp_files ();
   return 0;
 }
