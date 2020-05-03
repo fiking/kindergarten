@@ -2,7 +2,9 @@ CFLAGS = -g -I.
 CC = gcc
 OBSTACK1=obstack.o
 
-all: gcc cpp
+OBJS = toplev.o
+
+all: gcc cc1 cpp
 gcc: gcc.o $(OBSTACK1)
 	$(CC) gcc.o $(OBSTACK1) -o gcc
 
@@ -12,6 +14,9 @@ gcc.o: gcc.c
 obstack.o: obstack.c
 	$(CC) -c obstack.c $(CFLAGS)
 
+
+cc1: $(OBJS) $(OBSTACK1)
+	$(CC) -o cc1 $(OBJS) $(OBSTACK1)
 
 # Making the preprocessor
 cpp: cccp
