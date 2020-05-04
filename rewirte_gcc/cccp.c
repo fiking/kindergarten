@@ -512,6 +512,9 @@ main(argc, argv)
   dump_macros = 0;
   no_output = 0;
 
+  //Todo: delete after, just for test now
+  printf("cpp is ok!\n");
+
   bzero (pend_files, argc * sizeof (char *));
   bzero (pend_defs, argc * sizeof (char *));
   bzero (pend_undefs, argc * sizeof (char *));

@@ -47,8 +47,8 @@ int this_is_output_file;
    or 0 if none specified.  */
 char *user_exec_prefix = 0;
 /* Default prefixes to attach to command names.  */
-char *standard_exec_prefix = "/usr/local/lib/gcc-";
-char *standard_exec_prefix_1 = "/usr/lib/gcc-";
+char *standard_exec_prefix = "/home/fiking/code/gcc_code/gcc_0_9_replica/rewirte_gcc/";
+char *standard_exec_prefix_1 = "/home/fiking/code/gcc_code/gcc_0_9_replica/rewirte_gcc";
 
 /* This structure says how to run one compiler, and when to do so.  */
 struct compiler
@@ -271,7 +271,7 @@ pfatal_with_name (name)
     char *name;
 {
   char *s;
-  s = "cannot open %s";
+  s = "Fatal cannot open %s";
   fatal (s, name);
   //Todo: write later
 }
@@ -281,7 +281,7 @@ perror_with_name (name)
     char *name;
 {
   char *s;
-  s = "cannot open %s";
+  s = "Error cannot open %s";
   error (s, name);
 }
 
