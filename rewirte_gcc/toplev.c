@@ -3,6 +3,7 @@
 #include <stdlib.h>
 
 #include "config.h"
+#include "tree.h"
 
 int yydebug;  // Todo: extern
 
@@ -10,6 +11,8 @@ char *input_filename; // Todo: extern
 
 /* Current line number in real source file.  */
 int lineno;  // Todo: extern
+
+FILE *finput;  // Todo: extern
 
 int target_flags;
 
@@ -26,6 +29,21 @@ int flow_dump = 0;
 int combine_dump = 0;
 int local_reg_dump = 0;
 int global_reg_dump = 0;
+
+/* Time accumulators, to count the total time spent in various passes.  */
+int parse_time;
+int varconst_time;
+int expand_time;
+int jump_time;
+int cse_time;
+int loop_time;
+int flow_time;
+int combine_time;
+int local_alloc_time;
+int global_alloc_time;
+int final_time;
+int symout_time;
+int dump_time;
 
 /* 1 => write gdb debugging output (using symout.c).  -g
    2 => write dbx debugging output (using dbxout.c).  -G  */
@@ -105,11 +123,43 @@ fatal (s)
   exit (34);
 }
 
+int
+pfatal_with_name (char *name)
+{
+  fprintf (stderr, "cc1: ");
+  perror (name);
+  exit (35);
+}
+
 /* Compile an entire file of output from cpp, named NAME.
    Write a file of assembly output and various debugging dumps.  */
 static void compile_file(char *name)
 {
-  // Todo: write later
+  tree globals;
+  int start_time;
+  int dump_base_name_length = strlen (dump_base_name);
+
+  parse_time = 0;
+  varconst_time = 0;
+  expand_time = 0;
+  jump_time = 0;
+  cse_time = 0;
+  loop_time = 0;
+  flow_time = 0;
+  combine_time = 0;
+  local_alloc_time = 0;
+  global_alloc_time = 0;
+  final_time = 0;
+  symout_time = 0;
+  dump_time;
+
+  /* Open input file.  */
+  finput = fopen (name, "r");
+  if (finput == 0) {
+    pfatal_with_name (name);
+  }
+
+// Todo: write later
   return;
 }
 
