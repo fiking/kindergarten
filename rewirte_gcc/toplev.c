@@ -14,6 +14,8 @@ int lineno;  // Todo: extern
 
 FILE *finput;  // Todo: extern
 
+extern void init_tree ();
+
 int target_flags;
 
 char *dump_base_name;
@@ -44,6 +46,8 @@ int global_alloc_time;
 int final_time;
 int symout_time;
 int dump_time;
+
+FILE *asm_out_file;
 
 /* 1 => write gdb debugging output (using symout.c).  -g
    2 => write dbx debugging output (using dbxout.c).  -G  */
@@ -93,6 +97,29 @@ set_target_switch (name)
   }
 }
 
+/* Report a warning at line LINE.
+   S and V are a string and an arg for `printf'.  */
+void
+warning_with_line (line, s, v)
+    int line;
+	char *s;
+	int v;
+{
+  // Todo: write later
+  fprintf (stderr, "%s:%d: ", input_filename, line);
+  fprintf (stderr, "warning: ");
+  fprintf (stderr, s, v);
+  fprintf (stderr, "\n");
+}
+
+void
+warning (s, v)
+    char *s;
+	int v;         /* @@also used as pointer */
+{
+  warning_with_line (lineno, s, v);
+}
+
 /* Report an error at line LINE.
    S and V are a string and an arg for `printf'.  */
 void
@@ -131,6 +158,46 @@ pfatal_with_name (char *name)
   exit (35);
 }
 
+/* Same as `malloc' but report error if no memory available.  */
+char *
+xmalloc (size)
+    unsigned size;
+{
+  char *value = (char *) malloc (size);
+  if (value == 0) {
+    fatal ("Virtual memory exhausted.");
+  }
+  return value;
+}
+
+/* Same as `realloc' but report error if no memory available.  */
+char *
+xrealloc (ptr, size)
+    char *ptr;
+	int size;
+{
+  char *result = realloc (ptr, size);
+  if (!result) {
+    abort ();
+  }
+  return result;
+}
+
+/* Return the logarithm of X, base 2, considering X unsigned,
+   if X is a power of 2.  Otherwise, returns -1.  */
+int
+exact_log2 (x)
+    register unsigned int x;
+{
+  register int log = 0;
+  for (log = 0; log < HOST_BITS_PER_INT; log++) {
+    if (x == (1 << log)) {
+	  return log;
+	}
+  }
+  return -1;
+}
+
 /* Compile an entire file of output from cpp, named NAME.
    Write a file of assembly output and various debugging dumps.  */
 static void compile_file(char *name)
@@ -159,6 +226,7 @@ static void compile_file(char *name)
     pfatal_with_name (name);
   }
 
+  init_tree ();
 // Todo: write later
   return;
 }

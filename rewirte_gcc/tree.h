@@ -20,6 +20,7 @@ and this notice must be preserved on all copies.  */
 
 
 /* codes of tree nodes */
+#include <stdio.h>
 
 #define DEFTREECODE(SYM, STRING, TYPE, NARGS)   SYM,
 
