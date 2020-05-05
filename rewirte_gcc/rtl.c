@@ -28,12 +28,14 @@ and this notice must be preserved on all copies.  */
 #include <ctype.h>
 #include <stdio.h>
 #include <strings.h>
+#include <stdlib.h>
 #include "rtl.h"
 
 #include <obstack.h>
 #define	obstack_chunk_alloc	xmalloc
 #define	obstack_chunk_free	free
-extern int xmalloc ();
+extern char *xmalloc ();
+extern char *xrealloc ();
 extern void free ();
 
 /* We use the same obstack used for the tree.
@@ -651,7 +653,7 @@ read_name (str, infile)
       *p++ = c;
       c = getc (infile);
     }
-  *p = NULL;
+  *p = 0;
 }
 
 /* Read an rtx in printed representation from INFILE

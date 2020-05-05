@@ -42,6 +42,9 @@ and this notice must be preserved on all copies.  */
 
 #include <stdio.h>
 #include <stab.h>
+#include <stdlib.h>
+#include <string.h>
+
 #include "config.h"
 #include "rtl.h"
 #include "regs.h"
@@ -60,6 +63,9 @@ static void output_operand ();
 static void output_address ();
 static void output_addr_reg ();
 void output_addr_const ();
+void output_source_line ();
+
+int constrain_operands ();
 
 static char *reg_name[] = REGISTER_NAMES;
 
@@ -289,30 +295,42 @@ final (first, file, fnname, write_symbols, optimize)
 	       and output them as such.  */
 
 	    if (GET_CODE (body) == ADDR_VEC)
-	      {
-		enum machine_mode mode = GET_MODE (body);
-		char *pseudo = (mode == SImode) ? ".int"
-		  : ((mode == HImode) ? ".word" : (char *) abort ());
-		register int vlen, idx;
-		vlen = XVECLEN (body, 0);
-		for (idx = 0; idx < vlen; idx++)
-		  fprintf (file, "\t%s L%d\n", pseudo,
-			   CODE_LABEL_NUMBER (XEXP (XVECEXP (body, 0, idx), 0)));
-		break;
-	      }
+		{
+			enum machine_mode mode = GET_MODE (body);
+			char *pseudo = NULL;
+			if (mode == SImode) {
+				pseudo = ".int";
+			} else if (mode == HImode) {
+				pseudo = ".word";
+			} else {
+				abort();
+			}
+			register int vlen, idx;
+			vlen = XVECLEN (body, 0);
+			for (idx = 0; idx < vlen; idx++)
+				fprintf (file, "\t%s L%d\n", pseudo,
+						CODE_LABEL_NUMBER (XEXP (XVECEXP (body, 0, idx), 0)));
+			break;
+		}
 	    if (GET_CODE (body) == ADDR_DIFF_VEC)
-	      {
-		enum machine_mode mode = GET_MODE (body);
-		char *pseudo = (mode == SImode) ? ".int"
-		  : ((mode == HImode) ? ".word" : (char *) abort ());
-		register int vlen, idx;
-		vlen = XVECLEN (body, 1);
-		for (idx = 0; idx < vlen; idx++)
-		  fprintf (file, "\t%s L%d-L%d\n", pseudo,
-			   CODE_LABEL_NUMBER (XEXP (XVECEXP (body, 1, idx), 0)),
-			   CODE_LABEL_NUMBER (XEXP (XEXP (body, 0), 0)));
-		break;
-	      }
+		{
+			enum machine_mode mode = GET_MODE (body);
+			char *pseudo = NULL;
+			if (mode == SImode) {
+				pseudo = ".int";
+			} else if (mode == HImode) {
+				pseudo = ".word";
+			} else {
+				abort();
+			}
+			register int vlen, idx;
+			vlen = XVECLEN (body, 1);
+			for (idx = 0; idx < vlen; idx++)
+				fprintf (file, "\t%s L%d-L%d\n", pseudo,
+						CODE_LABEL_NUMBER (XEXP (XVECEXP (body, 1, idx), 0)),
+						CODE_LABEL_NUMBER (XEXP (XEXP (body, 0), 0)));
+			break;
+		}
 
 	    /* We have a real machine instruction as rtl.  */
 
@@ -493,7 +511,7 @@ final (first, file, fnname, write_symbols, optimize)
 
 /* Output debugging info to the assembler file
    based on the NOTE insn INSN, assumed to be a line number.  */
-
+void
 output_source_line (file, insn)
      FILE *file;
      rtx insn;
