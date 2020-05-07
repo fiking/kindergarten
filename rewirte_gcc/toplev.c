@@ -1,9 +1,14 @@
 #include <stdio.h>
 #include <string.h>
 #include <stdlib.h>
-
+#include <sys/time.h>
+#include <sys/resource.h>
 #include "config.h"
 #include "tree.h"
+#include "rtl.h"
+
+#define TIMEVAR(VAR, BODY)    \
+  { int otime = gettime (); BODY; VAR += gettime () - otime; }
 
 int yydebug;  // Todo: extern
 
@@ -79,6 +84,10 @@ char *asm_file_name;
 /* Decode -m switches.  */
 struct {char *name; int value;} target_switches []
     = TARGET_SWITCHES;
+
+/* Nonzero for -pedantic switch: warn about anything
+   that standard C forbids.  */
+int pedantic = 0;
 
 void
 set_target_switch (name)
@@ -196,6 +205,69 @@ exact_log2 (x)
 	}
   }
   return -1;
+}
+
+int
+floor_log2 (x)
+    register unsigned int x;
+{
+  register int log = 0;
+  for (log = 0; log < HOST_BITS_PER_INT; log++) {
+     if ((x & ((-1) << log)) == 0) {
+	   return log - 1;
+	 }
+  }
+  return HOST_BITS_PER_INT - 1;
+}
+
+void
+announce_function (decl)
+	tree decl;
+{
+  if (! quiet_flag) {
+    printf (stderr, " %s", IDENTIFIER_POINTER (DECL_NAME (decl)));
+	fflush (stderr);
+  }
+}
+
+int
+gettime ()
+{
+  struct rusage rusages;
+  if (quiet_flag) {
+    return 0;
+  }
+  getrusage (0, &rusages);
+
+  return (rusages.ru_utime.tv_sec * 1000000 + rusages.ru_utime.tv_usec
+      + rusages.ru_stime.tv_sec * 1000000 + rusages.ru_stime.tv_usec);
+}
+
+void
+rest_of_compilation (decl, top_level)
+    tree decl;
+	int top_level;
+{
+  register rtx insns;
+  int start_time = gettime ();
+  int tem;
+
+  /* Declarations of variables, and of functions defined elsewhere.  */
+  if ((TREE_CODE (decl) == VAR_DECL || (TREE_CODE (decl) == FUNCTION_DECL
+      && DECL_INITIAL (decl) == 0))
+	  && (TREE_STATIC  (decl) || TREE_EXTERNAL (decl))) {
+    TIMEVAR (varconst_time, 
+	         {
+			   assemble_variable (decl, top_level);
+			   if (write_symbols == 2)
+			     dbxout_symbol (decl, 0);
+			 });
+  } //else if (TREE_CODE (decl) == FUNCTION_DECL &&
+    //         && DECL_INITIAL (decl)) {
+
+  /* Function definitions are the real work (all the rest of this function).  */
+    // Todo: write later
+//  }
 }
 
 /* Compile an entire file of output from cpp, named NAME.

@@ -27,6 +27,8 @@ and this notice must be preserved on all copies.  */
 
 extern int target_flags;
 
+extern short *reg_renumber;
+
 extern int reg_mentioned_p ();
 
 /* Macros used in the machine description to test the flags.  */
