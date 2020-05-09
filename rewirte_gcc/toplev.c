@@ -53,6 +53,17 @@ int symout_time;
 int dump_time;
 
 FILE *asm_out_file;
+FILE *tree_dump_file;
+FILE *rtl_dump_file;
+FILE *jump_opt_dump_file;
+FILE *cse_dump_file;
+FILE *loop_dump_file;
+FILE *flow_dump_file;
+FILE *combine_dump_file;
+FILE *local_reg_dump_file;
+FILE *global_reg_dump_file;
+
+
 
 /* 1 => write gdb debugging output (using symout.c).  -g
    2 => write dbx debugging output (using dbxout.c).  -G  */
@@ -262,12 +273,82 @@ rest_of_compilation (decl, top_level)
 			   if (write_symbols == 2)
 			     dbxout_symbol (decl, 0);
 			 });
-  } //else if (TREE_CODE (decl) == FUNCTION_DECL &&
-    //         && DECL_INITIAL (decl)) {
-
+  } else if (TREE_CODE (decl) == FUNCTION_DECL && DECL_INITIAL (decl)) {
   /* Function definitions are the real work (all the rest of this function).  */
+    if (tree_dump) {
+	  TIMEVAR (dump_time, dump_tree (tree_dump_file, decl));
+	}
+	/* Output some preliminaries for assembler.  */
+	TIMEVAR (varconst_time, assemble_function (decl));
+
+	/* Generate rtl code for this function (see stmt.c, expr.c).  */
+	TIMEVAR (expand_time,
+	         {
+	          init_emit (write_symbols);
+			  insns = expand_function (decl, !optimize);
+             });
+	  
+    /* Dump the rtl code if we are dumping rtl.  */
+    if (rtl_dump) {
+	  TIMEVAR (dump_time,
+	           {
+	   		    fprintf (rtl_dump_file, "\n;; Function %s\n\n",
+				         IDENTIFIER_POINTER (DECL_NAME (decl)));
+				print_rtl (rtl_dump_file, insns);
+				fflush (rtl_dump_file);
+			   });
+	}
+
+	if (rtl_dump_and_exit) {
+	  goto exit_rest_of_compilation;
+	}
+	 
+	/* Do jump optimization the first time, if -opt.  */
+	if (optimize) {
+	  TIMEVAR (jump_time, jump_optimize (insns, 0));
+	}
+
+	/* Dump rtl code after jump, if we are doing that.  */
+	if (jump_opt_dump) {
+	  TIMEVAR (dump_time,
+	            {
+				  fprintf (jump_opt_dump_file, "\n;; Function %s\n\n",
+				           IDENTIFIER_POINTER (DECL_NAME (decl)));
+                  print_rtl (jump_opt_dump_file, insns);
+				  fflush (jump_opt_dump_file);
+				});
+	}
+
+	/* Perform common subexpression elimination.
+	   Nonzero value from `cse_main' means that jumps were simplified
+	   and some code may now be unreachable, so do
+       jump optimization again.  */
+
+    if (optimize) {
+		TIMEVAR (cse_time, reg_scan (insns, max_reg_num ()));
+		TIMEVAR (cse_time, tem = cse_main (insns, max_reg_num ()));
+		if (tem) {
+			TIMEVAR (jump_time, jump_optimize (insns, 0));
+		}
+	}
+
+	/* Dump rtl code after cse, if we are doing that.  */
+	if (cse_dump) {
+	  TIMEVAR (dump_time,
+	           {
+			     fprintf (cse_dump_file, "\n;; Function %s\n\n",
+				          IDENTIFIER_POINTER (DECL_NAME (decl)));
+   			     print_rtl (cse_dump_file, insns);
+				 fflush (cse_dump_file);
+			   });
+	}
     // Todo: write later
-//  }
+  }
+
+exit_rest_of_compilation:
+  /* The parsing time is all the time spent in yyparse
+     *except* what is spent in this function.  */
+  parse_time -= gettime () - start_time;
 }
 
 /* Compile an entire file of output from cpp, named NAME.
@@ -298,6 +379,7 @@ static void compile_file(char *name)
     pfatal_with_name (name);
   }
 
+  printf("cc1-compile_file is ok! %s\n", name);
   init_tree ();
 // Todo: write later
   return;

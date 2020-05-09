@@ -13,7 +13,8 @@ OBJS = toplev.o tree.o decl.o stor-layout.o \
 	   recog.o insn-recog.o insn-extract.o insn-output.o \
 	   optabs.o expmed.o stmt.o stupid.o \
 	   regclass.o combine.o reload.o reload1.o \
-	   global-alloc.o jump.o dbxout.o
+	   global-alloc.o jump.o dbxout.o print-tree.o \
+	   cse.o
 
 all: gcc cc1 cpp
 gcc: gcc.o $(OBSTACK1)
@@ -57,6 +58,8 @@ reload1.o: reload1.c
 global-alloc.o: global-alloc.c
 jump.o: jump.c
 dbxout.o: dbxout.c
+print-tree.o: print-tree.c
+cse.o: cse.c
 
 parse.tab.c : parse.y
 	bison -v parse.y
@@ -66,8 +69,8 @@ cpp: cccp
 	-rm -f cpp
 	ln cccp cpp
 
-cccp: cccp.o
-	cc -o cccp -g cccp.o
+cccp: cccp.o y.tab.o
+	cc -o cccp -g cccp.o y.tab.o
 
 y.tab.o: y.tab.c
 y.tab.c: cexp.y
