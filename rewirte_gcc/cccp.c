@@ -355,6 +355,7 @@ xcalloc (number, size)
 	  while (i < total) {
 	    ptr[i++] = 0;
 	  }
+	  return ptr;
 	}
   }
   memory_full ();
@@ -1065,9 +1066,10 @@ main(argc, argv)
   } else {
     write (fileno (stdout), outbuf.buf, outbuf.bufp - outbuf.buf);
   }
+
+  return 0;
 perror:
   pfatal_with_name (argv[1]);
-  return 0;
 }
 
 static DEFINITION *
