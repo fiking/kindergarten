@@ -3,12 +3,23 @@
 #include <stdlib.h>
 #include <sys/time.h>
 #include <sys/resource.h>
+#include <sys/stat.h>
+
 #include "config.h"
 #include "tree.h"
 #include "rtl.h"
 
+extern void dump_combine_total_stats ();
+extern void symout_finish ();
+extern int symout_top_blocks ();
 #define TIMEVAR(VAR, BODY)    \
   { int otime = gettime (); BODY; VAR += gettime () - otime; }
+print_time (str, total)
+     char *str;
+     int total;
+{
+  printf ("time in %s: %d.%06d\n", str, total / 1000000, total % 1000000);
+}
 
 int yydebug;  // Todo: extern
 
@@ -26,7 +37,7 @@ int target_flags;
 char *dump_base_name;
 
 /* Flags saying which kinds of debugging dump have been requested.  */
-int tree_dump = 0;
+int tree_dump = 1;
 int rtl_dump = 0;
 int rtl_dump_and_exit = 0;
 int jump_opt_dump = 0;
@@ -254,100 +265,286 @@ gettime ()
       + rusages.ru_stime.tv_sec * 1000000 + rusages.ru_stime.tv_usec);
 }
 
+/* This is called from finish_function (within yyparse)
+   after each top-level definition is parsed, and from
+   finish_decl (also within yyparse) for each other top-level declaration.
+   It is supposed to compile that function or variable
+   and output the assembler code for it.
+   After we return, the tree storage is freed.  */
+
 void
 rest_of_compilation (decl, top_level)
-    tree decl;
-	int top_level;
+     tree decl;
+     int top_level;
 {
   register rtx insns;
   int start_time = gettime ();
   int tem;
 
   /* Declarations of variables, and of functions defined elsewhere.  */
-  if ((TREE_CODE (decl) == VAR_DECL || (TREE_CODE (decl) == FUNCTION_DECL
-      && DECL_INITIAL (decl) == 0))
-	  && (TREE_STATIC  (decl) || TREE_EXTERNAL (decl))) {
-    TIMEVAR (varconst_time, 
-	         {
-			   assemble_variable (decl, top_level);
-			   if (write_symbols == 2)
-			     dbxout_symbol (decl, 0);
-			 });
-  } else if (TREE_CODE (decl) == FUNCTION_DECL && DECL_INITIAL (decl)) {
-  /* Function definitions are the real work (all the rest of this function).  */
-    if (tree_dump) {
-	  TIMEVAR (dump_time, dump_tree (tree_dump_file, decl));
-	}
-	/* Output some preliminaries for assembler.  */
-	TIMEVAR (varconst_time, assemble_function (decl));
 
-	/* Generate rtl code for this function (see stmt.c, expr.c).  */
-	TIMEVAR (expand_time,
-	         {
-	          init_emit (write_symbols);
-			  insns = expand_function (decl, !optimize);
-             });
-	  
-    /* Dump the rtl code if we are dumping rtl.  */
-    if (rtl_dump) {
-	  TIMEVAR (dump_time,
-	           {
-	   		    fprintf (rtl_dump_file, "\n;; Function %s\n\n",
-				         IDENTIFIER_POINTER (DECL_NAME (decl)));
-				print_rtl (rtl_dump_file, insns);
-				fflush (rtl_dump_file);
-			   });
+  if ((TREE_CODE (decl) == VAR_DECL
+       || (TREE_CODE (decl) == FUNCTION_DECL
+	   && DECL_INITIAL (decl) == 0))
+      && (TREE_STATIC  (decl) || TREE_EXTERNAL (decl)))
+    {
+      TIMEVAR (varconst_time,
+	       {
+		 assemble_variable (decl, top_level);
+		 if (write_symbols == 2)
+		   dbxout_symbol (decl, 0);
+	       });
+    }
+
+  /* Function definitions are the real work
+     (all the rest of this function).  */
+
+  else if (TREE_CODE (decl) == FUNCTION_DECL
+	   && DECL_INITIAL (decl))
+    {
+      /* Dump the function's tree if we are dumping trees.  */
+      printf("rest_of_compilation\n");
+      if (tree_dump)
+	TIMEVAR (dump_time,
+		 dump_tree (tree_dump_file, decl));
+
+      /* Output some preliminaries for assembler.  */
+
+      TIMEVAR (varconst_time, assemble_function (decl));
+
+      /* Generate rtl code for this function (see stmt.c, expr.c).  */
+
+      TIMEVAR (expand_time,
+	       {
+		 init_emit (write_symbols);
+		 insns = expand_function (decl, !optimize);
+	       });
+
+      /* Dump the rtl code if we are dumping rtl.  */
+
+      if (rtl_dump)
+	TIMEVAR (dump_time,
+		 {
+		   fprintf (rtl_dump_file, "\n;; Function %s\n\n",
+			    IDENTIFIER_POINTER (DECL_NAME (decl)));
+		   print_rtl (rtl_dump_file, insns);
+		   fflush (rtl_dump_file);
+		 });
+
+      if (rtl_dump_and_exit)
+	goto exit_rest_of_compilation;
+
+      /* Do jump optimization the first time, if -opt.  */
+
+      if (optimize)
+	TIMEVAR (jump_time, jump_optimize (insns, 0));
+
+      /* Dump rtl code after jump, if we are doing that.  */
+
+      if (jump_opt_dump)
+	TIMEVAR (dump_time,
+		 {
+		   fprintf (jump_opt_dump_file, "\n;; Function %s\n\n",
+			    IDENTIFIER_POINTER (DECL_NAME (decl)));
+		   print_rtl (jump_opt_dump_file, insns);
+		   fflush (jump_opt_dump_file);
+		 });
+
+      /* Perform common subexpression elimination.
+	 Nonzero value from `cse_main' means that jumps were simplified
+	 and some code may now be unreachable, so do
+	 jump optimization again.  */
+
+      if (optimize)
+	{
+	  TIMEVAR (cse_time, reg_scan (insns, max_reg_num ()));
+
+	  TIMEVAR (cse_time, tem = cse_main (insns, max_reg_num ()));
+
+	  if (tem)
+	    TIMEVAR (jump_time, jump_optimize (insns, 0));
 	}
 
-	if (rtl_dump_and_exit) {
-	  goto exit_rest_of_compilation;
-	}
-	 
-	/* Do jump optimization the first time, if -opt.  */
-	if (optimize) {
-	  TIMEVAR (jump_time, jump_optimize (insns, 0));
-	}
+      /* Dump rtl code after cse, if we are doing that.  */
 
-	/* Dump rtl code after jump, if we are doing that.  */
-	if (jump_opt_dump) {
-	  TIMEVAR (dump_time,
-	            {
-				  fprintf (jump_opt_dump_file, "\n;; Function %s\n\n",
-				           IDENTIFIER_POINTER (DECL_NAME (decl)));
-                  print_rtl (jump_opt_dump_file, insns);
-				  fflush (jump_opt_dump_file);
-				});
+      if (cse_dump)
+	TIMEVAR (dump_time,
+		 {
+		   fprintf (cse_dump_file, "\n;; Function %s\n\n",
+			    IDENTIFIER_POINTER (DECL_NAME (decl)));
+		   print_rtl (cse_dump_file, insns);
+		   fflush (cse_dump_file);
+		 });
+
+      /* Move constant computations out of loops.  */
+
+      if (optimize)
+	{
+	  TIMEVAR (loop_time, loop_optimize (insns, max_reg_num ()));
 	}
 
-	/* Perform common subexpression elimination.
-	   Nonzero value from `cse_main' means that jumps were simplified
-	   and some code may now be unreachable, so do
-       jump optimization again.  */
+      /* Dump rtl code after loop opt, if we are doing that.  */
 
-    if (optimize) {
-		TIMEVAR (cse_time, reg_scan (insns, max_reg_num ()));
-		TIMEVAR (cse_time, tem = cse_main (insns, max_reg_num ()));
-		if (tem) {
-			TIMEVAR (jump_time, jump_optimize (insns, 0));
-		}
+      if (loop_dump)
+	TIMEVAR (dump_time,
+		 {
+		   fprintf (loop_dump_file, "\n;; Function %s\n\n",
+			    IDENTIFIER_POINTER (DECL_NAME (decl)));
+		   print_rtl (loop_dump_file, insns);
+		   fflush (loop_dump_file);
+		 });
+
+      /* Now we choose between stupid (pcc-like) register allocation
+	 (if we got the -noreg switch and not -opt)
+	 and smart register allocation.  */
+
+      if (optimize)		/* Stupid allocation probably won't work */
+	obey_regdecls = 0;	/* if optimizations being done.  */
+
+      /* Print function header into flow dump now
+	 because doing the flow analysis makes some of the dump.  */
+
+      if (flow_dump)
+	TIMEVAR (dump_time,
+		 {
+		   fprintf (flow_dump_file, "\n;; Function %s\n\n",
+			    IDENTIFIER_POINTER (DECL_NAME (decl)));
+		 });
+
+      if (obey_regdecls)
+	{
+	  TIMEVAR (flow_time,
+		   {
+		     regclass (insns, max_reg_num ());
+		     stupid_life_analysis (insns, max_reg_num (),
+					   flow_dump_file);
+		   });
+	}
+      else
+	{
+	  /* Do control and data flow analysis,
+	     and write some of the results to dump file.  */
+
+	  TIMEVAR (flow_time, flow_analysis (insns, max_reg_num (),
+					     flow_dump_file));
 	}
 
-	/* Dump rtl code after cse, if we are doing that.  */
-	if (cse_dump) {
-	  TIMEVAR (dump_time,
-	           {
-			     fprintf (cse_dump_file, "\n;; Function %s\n\n",
-				          IDENTIFIER_POINTER (DECL_NAME (decl)));
-   			     print_rtl (cse_dump_file, insns);
-				 fflush (cse_dump_file);
-			   });
-	}
-    // Todo: write later
-  }
+      /* Dump rtl after flow analysis.  */
 
-exit_rest_of_compilation:
+      if (flow_dump)
+	TIMEVAR (dump_time,
+		 {
+		   print_rtl (flow_dump_file, insns);
+		   fflush (flow_dump_file);
+		 });
+
+      /* If -opt, try combining insns through substitution.  */
+
+      if (optimize)
+	TIMEVAR (combine_time, combine_instructions (insns, max_reg_num ()));
+
+      /* Dump rtl code after insn combination.  */
+
+      if (combine_dump)
+	TIMEVAR (dump_time,
+		 {
+		   fprintf (combine_dump_file, "\n;; Function %s\n\n",
+			    IDENTIFIER_POINTER (DECL_NAME (decl)));
+		   dump_combine_stats (combine_dump_file);
+		   print_rtl (combine_dump_file, insns);
+		   fflush (combine_dump_file);
+		 });
+
+      /* Unless we did stupid register allocation,
+	 allocate pseudo-regs that are used only within 1 basic block.  */
+
+      if (!obey_regdecls)
+	TIMEVAR (local_alloc_time,
+		 {
+		   regclass (insns, max_reg_num ());
+		   local_alloc ();
+		 });
+
+      /* Dump rtl code after allocating regs within basic blocks.  */
+
+      if (local_reg_dump)
+	TIMEVAR (dump_time,
+		 {
+		   fprintf (local_reg_dump_file, "\n;; Function %s\n\n",
+			    IDENTIFIER_POINTER (DECL_NAME (decl)));
+		   dump_flow_info (local_reg_dump_file);
+		   dump_local_alloc (local_reg_dump_file);
+		   print_rtl (local_reg_dump_file, insns);
+		   fflush (local_reg_dump_file);
+		 });
+
+      if (global_reg_dump)
+	TIMEVAR (dump_time,
+		 fprintf (global_reg_dump_file, "\n;; Function %s\n\n",
+			  IDENTIFIER_POINTER (DECL_NAME (decl))));
+
+      /* Unless we did stupid register allocation,
+	 allocate remaining pseudo-regs, then do the reload pass
+	 fixing up any insns that are invalid.  */
+
+      TIMEVAR (global_alloc_time,
+	       {
+		 if (!obey_regdecls)
+		   global_alloc (global_reg_dump ? global_reg_dump_file : 0);
+		 else
+		   reload (insns, 0,
+			   global_reg_dump ? global_reg_dump_file : 0);
+	       });
+
+      if (global_reg_dump)
+	TIMEVAR (dump_time,
+		 {
+		   dump_global_regs (global_reg_dump_file);
+		   print_rtl (global_reg_dump_file, insns);
+		   fflush (global_reg_dump_file);
+		 });
+
+      /* One more attempt to remove jumps to .+1
+	 left by dead-store-elimination.
+	 Also do cross-jumping this time.  */
+
+      if (optimize)
+	TIMEVAR (jump_time, jump_optimize (insns, 1));
+
+      /* Now turn the rtl into assembler code.  */
+
+      TIMEVAR (final_time,
+	       {
+		 final (insns, asm_out_file,
+			IDENTIFIER_POINTER (DECL_NAME (decl)),
+			write_symbols, optimize);
+		 fflush (asm_out_file);
+	       });
+
+      /* Write GDB symbols if requested */
+
+      if (write_symbols == 1)
+	TIMEVAR (symout_time,
+		 {
+		   symout_types (get_permanent_types ());
+		   symout_types (get_temporary_types ());
+
+		   DECL_BLOCK_SYMTAB_ADDRESS (decl)
+		     = symout_function (DECL_INITIAL (decl),
+					DECL_ARGUMENTS (decl), 0);
+		 });
+
+      /* Write DBX symbols if requested */
+
+      if (write_symbols == 2)
+	TIMEVAR (symout_time, dbxout_function (decl));
+    }
+
+ exit_rest_of_compilation:
+
   /* The parsing time is all the time spent in yyparse
      *except* what is spent in this function.  */
+
   parse_time -= gettime () - start_time;
 }
 
@@ -374,15 +571,254 @@ static void compile_file(char *name)
   dump_time;
 
   /* Open input file.  */
+
   finput = fopen (name, "r");
-  if (finput == 0) {
+  if (finput == 0)
     pfatal_with_name (name);
-  }
 
   printf("cc1-compile_file is ok! %s\n", name);
+  /* Initialize data in various passes.  */
+
   init_tree ();
-// Todo: write later
-  return;
+  init_lex ();
+  init_rtl ();
+  init_decl_processing ();
+  init_optabs ();
+
+  /* If tree dump desired, open the output file.  */
+  if (tree_dump)
+    {
+      register char *dumpname = (char *) xmalloc (dump_base_name_length + 6);
+      strcpy (dumpname, dump_base_name);
+      strcat (dumpname, ".tree");
+	  printf ("tree_dump_file = %s\n", dumpname);
+
+      tree_dump_file = fopen (dumpname, "w");
+      if (tree_dump_file == 0)
+	pfatal_with_name (dumpname);
+    }
+
+  /* If rtl dump desired, open the output file.  */
+  if (rtl_dump)
+    {
+      register char *dumpname = (char *) xmalloc (dump_base_name_length + 6);
+      strcpy (dumpname, dump_base_name);
+      strcat (dumpname, ".rtl");
+      rtl_dump_file = fopen (dumpname, "w");
+      if (rtl_dump_file == 0)
+	pfatal_with_name (dumpname);
+    }
+
+  /* If jump_opt dump desired, open the output file.  */
+  if (jump_opt_dump)
+    {
+      register char *dumpname = (char *) xmalloc (dump_base_name_length + 6);
+      strcpy (dumpname, dump_base_name);
+      strcat (dumpname, ".jump");
+      jump_opt_dump_file = fopen (dumpname, "w");
+      if (jump_opt_dump_file == 0)
+	pfatal_with_name (dumpname);
+    }
+
+  /* If cse dump desired, open the output file.  */
+  if (cse_dump)
+    {
+      register char *dumpname = (char *) xmalloc (dump_base_name_length + 6);
+      strcpy (dumpname, dump_base_name);
+      strcat (dumpname, ".cse");
+      cse_dump_file = fopen (dumpname, "w");
+      if (cse_dump_file == 0)
+	pfatal_with_name (dumpname);
+    }
+
+  /* If loop dump desired, open the output file.  */
+  if (loop_dump)
+    {
+      register char *dumpname = (char *) xmalloc (dump_base_name_length + 6);
+      strcpy (dumpname, dump_base_name);
+      strcat (dumpname, ".loop");
+      loop_dump_file = fopen (dumpname, "w");
+      if (loop_dump_file == 0)
+	pfatal_with_name (dumpname);
+    }
+
+  /* If flow dump desired, open the output file.  */
+  if (flow_dump)
+    {
+      register char *dumpname = (char *) xmalloc (dump_base_name_length + 6);
+      strcpy (dumpname, dump_base_name);
+      strcat (dumpname, ".flow");
+      flow_dump_file = fopen (dumpname, "w");
+      if (flow_dump_file == 0)
+	pfatal_with_name (dumpname);
+    }
+
+  /* If combine dump desired, open the output file.  */
+  if (combine_dump)
+    {
+      register char *dumpname = (char *) xmalloc (dump_base_name_length + 10);
+      strcpy (dumpname, dump_base_name);
+      strcat (dumpname, ".combine");
+      combine_dump_file = fopen (dumpname, "w");
+      if (combine_dump_file == 0)
+	pfatal_with_name (dumpname);
+    }
+
+  /* If local_reg dump desired, open the output file.  */
+  if (local_reg_dump)
+    {
+      register char *dumpname = (char *) xmalloc (dump_base_name_length + 6);
+      strcpy (dumpname, dump_base_name);
+      strcat (dumpname, ".lreg");
+      local_reg_dump_file = fopen (dumpname, "w");
+      if (local_reg_dump_file == 0)
+	pfatal_with_name (dumpname);
+    }
+
+  /* If global_reg dump desired, open the output file.  */
+  if (global_reg_dump)
+    {
+      register char *dumpname = (char *) xmalloc (dump_base_name_length + 6);
+      strcpy (dumpname, dump_base_name);
+      strcat (dumpname, ".greg");
+      global_reg_dump_file = fopen (dumpname, "w");
+      if (global_reg_dump_file == 0)
+	pfatal_with_name (dumpname);
+    }
+
+  /* Open assembler code output file.  */
+ 
+  {
+    register char *dumpname = (char *) xmalloc (dump_base_name_length + 6);
+    strcpy (dumpname, dump_base_name);
+    strcat (dumpname, ".s");
+    asm_out_file = fopen (asm_file_name ? asm_file_name : dumpname, "w");
+    if (asm_out_file == 0)
+      pfatal_with_name (asm_file_name ? asm_file_name : dumpname);
+  }
+
+  input_filename = name;
+
+  /* the beginning of the file is a new line; check for # */
+  /* With luck, we discover the real source file's name from that
+     and put it in input_filename.  */
+  check_newline ();
+
+  /* If GDB symbol table desired, open the GDB symbol output file.  */
+  if (write_symbols == 1)
+    {
+      register char *dumpname = (char *) xmalloc (dump_base_name_length + 6);
+      strcpy (dumpname, dump_base_name);
+      strcat (dumpname, ".sym");
+      if (sym_file_name == 0)
+	sym_file_name = dumpname;
+      symout_init (sym_file_name, asm_out_file, input_filename);
+    }
+
+  /* If dbx symbol table desired, initialize writing it
+     and output the predefined types.  */
+  if (write_symbols == 2)
+    dbxout_init (asm_out_file, input_filename);
+
+  /* Initialize yet another pass.  */
+
+  init_final (input_filename);
+
+  start_time = gettime ();
+
+  /* Call the parser, which parses the entire file
+     (calling rest_of_compilation for each function).  */
+
+  yyparse ();
+
+  /* Compilation is now finished except for writing
+     what's left of the symbol table output.  */
+
+  parse_time += gettime () - start_time;
+
+  globals = getdecls ();
+
+  /* Do dbx symbols */
+  if (write_symbols == 2)
+    TIMEVAR (symout_time,
+	     {
+	       dbxout_tags (gettags ());
+	       dbxout_types (get_permanent_types ());
+	     });
+
+  /* Do gdb symbols */
+  if (write_symbols == 1)
+    TIMEVAR (symout_time,
+	     {
+	       struct stat statbuf;
+	       fstat (fileno (finput), &statbuf);
+	       symout_types (get_permanent_types ());
+	       symout_top_blocks (globals, gettags ());
+	       symout_finish (name, statbuf.st_ctime);
+	     });
+
+  /* Close non-debugging input and output files.  */
+
+  fclose (finput);
+  fclose (asm_out_file);
+
+  if (!quiet_flag)
+    fprintf (stderr,"\n");
+
+  /* Dump the global nodes and close the tree dump file.  */
+  if (tree_dump)
+    {
+      dump_tree (tree_dump_file, globals);
+      fclose (tree_dump_file);
+    }
+
+  /* Close all other dump files.  */
+
+  if (rtl_dump)
+    fclose (rtl_dump_file);
+
+  if (jump_opt_dump)
+    fclose (jump_opt_dump_file);
+
+  if (cse_dump)
+    fclose (cse_dump_file);
+
+  if (loop_dump)
+    fclose (loop_dump_file);
+
+  if (flow_dump)
+    fclose (flow_dump_file);
+
+  if (combine_dump)
+    {
+      dump_combine_total_stats (combine_dump_file);
+      fclose (combine_dump_file);
+    }
+
+  if (local_reg_dump)
+    fclose (local_reg_dump_file);
+
+  if (global_reg_dump)
+    fclose (global_reg_dump_file);
+
+  /* Print the times.  */
+
+  if (! quiet_flag)
+    {
+      print_time ("parse", parse_time);
+      print_time ("expand", expand_time);
+      print_time ("jump", jump_time);
+      print_time ("cse", cse_time);
+      print_time ("loop", loop_time);
+      print_time ("flow", flow_time);
+      print_time ("combine", combine_time);
+      print_time ("local-alloc", local_alloc_time);
+      print_time ("global-alloc", global_alloc_time);
+      print_time ("final", final_time);
+      print_time ("varconst", varconst_time);
+      print_time ("symout", symout_time);
+      print_time ("dump", dump_time);
+    }
 }
 
 

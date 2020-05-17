@@ -39,7 +39,7 @@ extern char *tree_code_type[];
 extern int tree_code_length[];
 extern char *mode_name[];
 
-extern char *spaces;
+extern char spaces[];
 
 #define MIN(x,y) ((x < y) ? x : y)
 
@@ -58,6 +58,8 @@ dump_tree (outf, root)
      FILE *outf;
      tree root;
 {
+  printf("debug dump_tree\n");
+
   markvec = (char *) alloca (tree_node_counter + 1);
   bzero (markvec, tree_node_counter + 1);
   outfile = outf;
@@ -71,7 +73,7 @@ wruid (node)
      tree node;
 {
  
-  if (node == NULL)
+  if (node == NULL || node < 0x100)
     fputs ("<>", outfile);
   else {
     fprintf (outfile, "%1d", TREE_UID (node));
@@ -121,7 +123,7 @@ walk (node, leaf, indent)
      tree leaf;
      int indent;
 {
-  if (node != NULL
+  if (node != NULL && node > 0x100
       /* Don't walk any global nodes reached from local nodes!
 	 The global nodes will be dumped at the end, all together.
 	 Also don't mention a FUNCTION_DECL node that is marked local
@@ -139,7 +141,7 @@ cwalk (s, leaf, indent)
      tree leaf;
      int indent;
 {
-  if (s != NULL) 
+  if (s != NULL && s > 0x100) 
     if (!TREE_LITERAL (s))
       walk(s, leaf, indent);
 }
@@ -267,14 +269,17 @@ dump (node, indent)
   register int i;
   register int len;
 
-  if (markvec[TREE_UID (node)])
+  if (markvec[TREE_UID (node)]) {
+    printf("debug dump TREE_UID=%d\n", TREE_UID (node));
     return;
+  }
   markvec[TREE_UID (node)] = 1;
 
   fputs ("   ", outfile);
   fprintf (outfile, "%5d", TREE_UID (node));
   fputs (spaces + (128 - MIN(40, (indent+1)*2)), outfile);
   fputs (tree_code_name[(int) code], outfile);
+  printf("debug dump\n");
 
   switch (*tree_code_type[(int) code])
     {
@@ -387,6 +392,7 @@ dump (node, indent)
       break;
 
     case 's':
+	  printf("code = %c\n", *tree_code_type[(int) code]);
       prtypeinfo (node);
       fprintf (outfile, " at %s line %d;",
 	       STMT_SOURCE_FILE (node), STMT_SOURCE_LINE (node));
@@ -394,7 +400,9 @@ dump (node, indent)
       len = tree_code_length[(int) code];
       for (i = 0; i < len; i++)
 	{
+	  printf("code1 = %c\n", *tree_code_type[(int) code]);
 	  fputs (" ", outfile);
+	  printf("code2 = %c\n", *tree_code_type[(int) code]);
 	  wruid (TREE_OPERAND (node, i+2));
 	  fputs (";", outfile);
 	}
@@ -441,6 +449,7 @@ dump (node, indent)
       break;
 
     case 'x':
+	  printf("code = %c\n", *tree_code_type[(int) code]);
       if (code == IDENTIFIER_NODE)
 	fprintf (outfile, " = %s;\n", IDENTIFIER_POINTER (node));
       else if (code == TREE_LIST)

@@ -200,7 +200,7 @@ expand_stmts (stmts, loop_exit)
      rtx loop_exit;
 {
   register tree stmt;
-  for (stmt = stmts; stmt; stmt = TREE_CHAIN (stmt))
+  for (stmt = stmts; stmt && stmt > 0x100; stmt = TREE_CHAIN (stmt))
     expand_stmt (stmt, loop_exit);
 }
 
@@ -903,7 +903,7 @@ assign_vars_1 (stmt)
 {
   register tree decl;
 
-  while (stmt)
+  while (stmt && stmt > 0x100)
     {
       switch (TREE_CODE (stmt))
 	{

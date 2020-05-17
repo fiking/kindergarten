@@ -14,7 +14,7 @@ OBJS = toplev.o tree.o decl.o stor-layout.o \
 	   optabs.o expmed.o stmt.o stupid.o \
 	   regclass.o combine.o reload.o reload1.o \
 	   global-alloc.o jump.o dbxout.o print-tree.o \
-	   cse.o symout.o
+	   cse.o symout.o loop.o
 
 all: gcc cc1 cpp
 gcc: gcc.o $(OBSTACK1)
@@ -61,6 +61,7 @@ dbxout.o: dbxout.c
 print-tree.o: print-tree.c
 cse.o: cse.c
 symout.o : symout.c
+loop.o : loop.c
 
 parse.tab.c : parse.y
 	bison -v parse.y
