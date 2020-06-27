@@ -324,7 +324,7 @@ expand_stmt (stmt, loop_exit)
       break;
 
     case RETURN_STMT:
-      if (STMT_BODY (stmt))
+      if (STMT_BODY (stmt) > 0x100)
 	{
 	  register rtx val = 0;
 	  register rtx op0;
@@ -863,10 +863,11 @@ assign_stack_local (mode, size)
 #ifdef FRAME_GROWS_DOWNWARD
   frame_offset -= size;
 #endif
-  value = gen_rtx (MEM, mode,
-		   gen_rtx (PLUS, Pmode,
-			    gen_rtx (REG, SImode, FRAME_POINTER_REGNUM),
-			    gen_rtx (CONST_INT, VOIDmode, frame_offset)));
+
+  rtx reg_temp = gen_rtx (REG, SImode, FRAME_POINTER_REGNUM);
+  rtx const_int_temp = gen_rtx (CONST_INT, VOIDmode, frame_offset);
+  rtx mem_temp = gen_rtx (PLUS, Pmode, reg_temp, const_int_temp);
+  value = gen_rtx (MEM, mode, mem_temp);
 #ifndef FRAME_GROWS_DOWNWARD
   frame_offset += size;
 #endif

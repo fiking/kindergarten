@@ -36,6 +36,7 @@ and this notice must be preserved on all copies.  */
 
 #include "config.h"
 #include <stdio.h>
+#include <stdarg.h>
 #include "rtl.h"
 #include "regs.h"
 #include "insn-config.h"
@@ -132,19 +133,18 @@ rtx real_constant_chain;
 */
 
 /*VARARGS2*/
-rtx
-gen_rtx (code, mode, first)
-     enum rtx_code code;	/* RTX Code...				*/
-     enum machine_mode mode;
-     int first;
+rtx gen_rtx(enum rtx_code code, enum machine_mode mode, ...)
 {
-  register char *argp;		/* Pointer to arguments...		*/
-  register int i, j;		/* Array indices...			*/
+  register int i;		/* Array indices...			*/
   register char *fmt;		/* Current rtx's format...		*/
   register rtx rt_val;		/* RTX to return to caller...		*/
 
+  va_list p;
+  va_start(p, 0);
+
   if (code == CONST_INT)
     {
+	  int first = va_arg(p, int);
       if (first == 0)
 	return const0_rtx;
       if (first == 1)
@@ -152,6 +152,7 @@ gen_rtx (code, mode, first)
     }
   if (code == CONST_DOUBLE)
     {
+	  double first = va_arg(p, double);
       if (first == XINT (fconst0_rtx, 0)
 	  && (&first)[1] == XINT (fconst0_rtx, 1))
 	return (mode == DFmode ? dconst0_rtx : fconst0_rtx);
@@ -159,8 +160,6 @@ gen_rtx (code, mode, first)
 
   rt_val = rtx_alloc (code);	/* Allocate the storage space.	*/
   rt_val->mode = mode;		/* Store the machine mode...	*/
-
-  argp = (char *) &first;	/* Get a pointer to the arguments...	*/
 
   fmt = GET_RTX_FORMAT (code);	/* Find the right format...	*/
   for (i = 0; i < GET_RTX_LENGTH (code); i++)
@@ -171,24 +170,20 @@ gen_rtx (code, mode, first)
 	  break;
 
 	case 'i':		/* An integer?				*/
-	  XINT (rt_val, i) = *(int *)argp;
-	  argp += sizeof (int);	/* Next argument in list...	*/
+	  XINT (rt_val, i) = va_arg(p, int);
 	  break;
 
 	case 's':		/* A string?				*/
-	  XSTR (rt_val, i) = *(char **)argp;
-	  argp += sizeof (char *);
+	  XSTR (rt_val, i) = va_arg(p, char *);
 	  break;
 
 	case 'e':		/* An expression?			*/
 	case 'u':		/* An insn?  Same except when printing.  */
-	  XEXP (rt_val, i) = *(rtx *)argp;
-	  argp += sizeof (rtx *);
+	  XEXP (rt_val, i) = va_arg(p, rtx);
 	  break;
 
 	case 'E':		/* An RTX vector?			*/
-	  XVEC (rt_val, i) = *(rtvec *)argp;
-	  argp += sizeof (rtvec *);
+	  XVEC (rt_val, i) = va_arg(p, rtvec);
 	  break;
 
 	default:		/* Invalid format specification...	*/
@@ -196,6 +191,7 @@ gen_rtx (code, mode, first)
 	}			/* End switch */
     }				/* End for */
 
+  va_end(p);
   return rt_val;		/* Return the new RTX...		*/
 }
 

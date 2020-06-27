@@ -285,7 +285,7 @@ enum reg_note { REG_DEAD = 1, REG_INC = 2, REG_CONST = 3, REG_WAS_0 = 4 };
 
 extern rtx rtx_alloc ();
 extern rtvec rtvec_alloc ();
-extern rtx gen_rtx ();
+extern rtx gen_rtx (enum rtx_code code, enum machine_mode mode, ...);
 extern rtx copy_rtx ();
 extern rtvec gen_rtvec ();
 extern rtvec gen_rtvec_v ();
