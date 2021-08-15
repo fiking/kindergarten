@@ -2715,7 +2715,7 @@ char* HandleScopeImplementer::RestoreThread(char* storage) {
 
 
 char* HandleScopeImplementer::RestoreThreadHelper(char* storage) {
-  memcpy(this, storage, sizeof(*this));
+  memcpy((void*)this, (void*)storage, sizeof(*this));
   *ImplementationUtilities::CurrentHandleScope() = handle_scope_data_;
   return storage + ArchiveSpacePerThread();
 }

@@ -40,7 +40,7 @@ BUILD_OPTIONS_MAP = {
         'CCFLAGS': '$DIALECTFLAGS $WARNINGFLAGS -g -O0',
         'CPPDEFINES': ['ENABLE_LOGGING_AND_PROFILING', 'ENABLE_DISASSEMBLER', 'DEBUG'],
         'CXXFLAGS': '$CCFLAGS -fno-rtti -fno-exceptions',
-        'DIALECTFLAGS': '-ansi',
+        'DIALECTFLAGS': '-ansi -m32',
         'LIBS': 'pthread',
         'WARNINGFLAGS': '-pedantic -Wall -W -Wno-unused-parameter -Werror'
       },
@@ -48,7 +48,7 @@ BUILD_OPTIONS_MAP = {
         'CCFLAGS': '$DIALECTFLAGS $WARNINGFLAGS -g -O0',
         'CPPDEFINES': ['ENABLE_LOGGING_AND_PROFILING', 'ENABLE_DISASSEMBLER', 'DEBUG'],
         'CXXFLAGS': '$CCFLAGS -fno-rtti -fno-exceptions',
-        'DIALECTFLAGS': '-ansi',
+        'DIALECTFLAGS': '-ansi -m32',
         'LIBS': 'pthread',
         'WARNINGFLAGS': '-Werror'
       },
@@ -56,7 +56,7 @@ BUILD_OPTIONS_MAP = {
         'CCFLAGS': '$DIALECTFLAGS $WARNINGFLAGS -g -O0',
         'CPPDEFINES': ['ENABLE_LOGGING_AND_PROFILING', 'ENABLE_DISASSEMBLER', 'DEBUG', 'SUPPORT_UTF8', 'NO_RECURSE', 'SUPPORT_UCP'],
         'CXXFLAGS': '$CCFLAGS -fno-rtti -fno-exceptions',
-        'DIALECTFLAGS': '-ansi',
+        'DIALECTFLAGS': '-ansi -m32',
         'LIBS': 'pthread',
         'WARNINGFLAGS': '-w'
       }
@@ -66,7 +66,7 @@ BUILD_OPTIONS_MAP = {
         'CCFLAGS': '$DIALECTFLAGS $WARNINGFLAGS -O2',
         'CPPDEFINES': ['ENABLE_LOGGING_AND_PROFILING'],
         'CXXFLAGS': '$CCFLAGS -fno-rtti -fno-exceptions',
-        'DIALECTFLAGS': '-ansi',
+        'DIALECTFLAGS': '-ansi -m32 -Wno-error=unused-but-set-variable -Wno-error=implicit-fallthrough -Wno-error=nonnull-compare -Wno-error=strict-aliasing -Wno-error=format-security -Wno-error=narrowing -Wno-error=unused-result',
         'LIBS': 'pthread',
         'WARNINGFLAGS': '-pedantic -Wall -W -Wno-unused-parameter -Werror'
       },
@@ -74,7 +74,7 @@ BUILD_OPTIONS_MAP = {
         'CCFLAGS': '$DIALECTFLAGS $WARNINGFLAGS -O2',
         'CPPDEFINES': ['ENABLE_LOGGING_AND_PROFILING'],
         'CXXFLAGS': '$CCFLAGS -fno-rtti -fno-exceptions',
-        'DIALECTFLAGS': '-ansi',
+        'DIALECTFLAGS': '-ansi -m32',
         'LIBS': 'pthread',
         'WARNINGFLAGS': '-Werror'
       },
@@ -82,7 +82,7 @@ BUILD_OPTIONS_MAP = {
         'CCFLAGS': '$DIALECTFLAGS $WARNINGFLAGS -O2',
         'CPPDEFINES': ['ENABLE_LOGGING_AND_PROFILING', 'SUPPORT_UTF8', 'NO_RECURSE', 'SUPPORT_UCP'],
         'CXXFLAGS': '$CCFLAGS -fno-rtti -fno-exceptions',
-        'DIALECTFLAGS': '-ansi',
+        'DIALECTFLAGS': '-ansi -m32',
         'LIBS': 'pthread',
         'WARNINGFLAGS': '-w'
       }
