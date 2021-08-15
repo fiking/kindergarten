@@ -1,0 +1,5 @@
+v8
+v8-0.1.5-mirror/
+release/
+.sconsign.dblite
+tools/js2c.pyc
