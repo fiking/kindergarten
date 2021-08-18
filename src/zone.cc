@@ -113,7 +113,7 @@ void Zone::DeleteAll() {
     } else {
 #ifdef DEBUG
       // Zap the entire current segment (including the header).
-      memset(current, kZapDeadByte, current->size());
+      memset((void*)current, kZapDeadByte, current->size());
 #endif
       Segment::Delete(current);
     }

@@ -79,11 +79,11 @@ def GetOptions():
   os_guess = GuessOS()
   toolchain_guess = GuessToolchain(os_guess)
   processor_guess = GuessProcessor()
-  result.Add('mode', 'debug or release', 'release')
+  result.Add('mode', 'debug or release', 'debug')
   result.Add('toolchain', 'the toolchain to use (gcc, gcc-darwin or msvc)', toolchain_guess)
   result.Add('os', 'the os to build for (linux, macos or win32)', os_guess)
   result.Add('processor', 'the processor to build for (arm or ia32)', 'ia32')
-  result.Add('snapshot', 'build using snapshots for faster start-up (on, off)', 'off')
+  result.Add('snapshot', 'build using snapshots for faster start-up (on, off)', 'on')
   result.Add('library', 'which type of library to produce (static, shared, default)', 'default')
   return result
 
