@@ -40,8 +40,9 @@ BUILD_OPTIONS_MAP = {
         'CCFLAGS': '$DIALECTFLAGS $WARNINGFLAGS -g -O0',
         'CPPDEFINES': ['ENABLE_LOGGING_AND_PROFILING', 'ENABLE_DISASSEMBLER', 'DEBUG'],
         'CXXFLAGS': '$CCFLAGS -fno-rtti -fno-exceptions',
-        'DIALECTFLAGS': '-ansi -m32',
+        'DIALECTFLAGS': '-ansi -m32 -Wno-error=unused-but-set-variable -Wno-error=implicit-fallthrough -Wno-error=nonnull-compare -Wno-error=strict-aliasing -Wno-error=format-security -Wno-error=narrowing -Wno-error=unused-result -Wno-error=unused-local-typedefs',
         'LIBS': 'pthread',
+		'LINKFLAGS' : '-m32',
         'WARNINGFLAGS': '-pedantic -Wall -W -Wno-unused-parameter -Werror'
       },
       'dtoa': {
@@ -68,6 +69,7 @@ BUILD_OPTIONS_MAP = {
         'CXXFLAGS': '$CCFLAGS -fno-rtti -fno-exceptions',
         'DIALECTFLAGS': '-ansi -m32 -Wno-error=unused-but-set-variable -Wno-error=implicit-fallthrough -Wno-error=nonnull-compare -Wno-error=strict-aliasing -Wno-error=format-security -Wno-error=narrowing -Wno-error=unused-result',
         'LIBS': 'pthread',
+		'LINKFLAGS' : '-m32',
         'WARNINGFLAGS': '-pedantic -Wall -W -Wno-unused-parameter -Werror'
       },
       'dtoa': {
@@ -376,6 +378,10 @@ def ConfigureBuild():
     libraries_obj = BuildObject(env, libraries_empty_src, CPPPATH=['.'])
   else:
     snapshot_obj = empty_snapshot_obj
+
+  # Create shell
+  shell_src = 'shell.cc'
+  shell = env.Program('shell', [shell_src, libraries_obj, non_snapshot_files, empty_snapshot_obj], PDB='shell.exe.pdb')
 
   all_files = [non_snapshot_files, libraries_obj, snapshot_obj]
   if library_type == 'static':
