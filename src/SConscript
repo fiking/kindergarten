@@ -379,6 +379,10 @@ def ConfigureBuild():
   else:
     snapshot_obj = empty_snapshot_obj
 
+  # Create shell
+  shell_src = 'shell.cc'
+  shell = env.Program('shell', [shell_src, libraries_obj, non_snapshot_files, empty_snapshot_obj], PDB='shell.exe.pdb')
+
   all_files = [non_snapshot_files, libraries_obj, snapshot_obj]
   if library_type == 'static':
     env.StaticLibrary('v8', all_files)
