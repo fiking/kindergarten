@@ -1,8 +1,8 @@
 #ifndef ALLOCATOR_H
 #define ALLOCATOR_H
 
-#include <stddef.h>
-#include <stdbool.h>
+#include <cstddef>
+#include <cstdbool>
 #include "memorymanager.h"
 
 #ifdef __cplusplus

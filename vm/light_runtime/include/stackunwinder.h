@@ -1,7 +1,7 @@
 #ifndef STACKUNWINDER_H
 #define STACKUNWINDER_H
-#include <stdint.h>
-#include <stddef.h>
+#include <cstdint>
+#include <cstddef>
 namespace maplert {
 
 class FrameCursor;

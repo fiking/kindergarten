@@ -1,6 +1,5 @@
 #include "stackunwinder.h"
-#include <stdio.h>
-#include <string.h>
+#include <cstring>
 
 namespace maplert {
 void FrameCursorFactory::InitializeFrameCursor(FrameCursor &cursor, uintptr_t *regs_addr) {

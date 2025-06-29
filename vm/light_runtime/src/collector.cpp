@@ -1,8 +1,10 @@
 #include "collector.h"
 #include <cstdint>
-#include "sizes.h"
 #include <cstdlib>
 #include <iostream>
+
+#include "sizes.h"
+#include "stackunwinder.h"
 
 #define DEBUGRC 0
 
@@ -62,5 +64,27 @@ void decChildren(object_t *obj) {
 
 void triggerGC()
 {
+}
+
+void runtGC(FrameCursor &cursor) {
+    // This function is a placeholder for the actual garbage collection logic.
+    // It would typically involve scanning the stack and heap to find live objects
+    // and updating their reference counts accordingly.
+    std::cout << "Running garbage collection..." << std::endl;
+    // Implement the actual GC logic here
+}
+
+uintptr_t mapleRT__yieldpoint_handler(uintptr_t regs_addr, void *userdata) {
+    // This function is called when a yield point is reached.
+    // It can be used to save the current state and potentially trigger garbage collection.
+    std::cout << "Yield point reached with regs_addr: " << std::hex << regs_addr << std::dec << std::endl;
+
+    FrameCursor cursor;
+    FrameCursorFactory factory;
+    factory.InitializeFrameCursor(cursor, reinterpret_cast<uintptr_t*>(regs_addr));
+
+    runtGC(cursor); // Run garbage collection
+
+    return 0; // Return value can be adjusted based on the GC logic
 }
 }

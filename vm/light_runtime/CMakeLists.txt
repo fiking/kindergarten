@@ -12,7 +12,10 @@ include_directories(${CMAKE_CURRENT_SOURCE_DIR}/include)
 # 添加 C++ 源文件
 file(GLOB SRC_FILES ${CMAKE_CURRENT_SOURCE_DIR}/src/*.cpp)
 # 单独添加汇编文件
-set(ASM_FILE ${CMAKE_CURRENT_SOURCE_DIR}/src/stackunwinder-asm.S)
+set(ASM_FILE 
+  ${CMAKE_CURRENT_SOURCE_DIR}/src/stackunwinder-asm.S
+  ${CMAKE_CURRENT_SOURCE_DIR}/src/yieldpoint-asm.S
+)
 
 add_library(light SHARED ${SRC_FILES} ${ASM_FILE})
 
