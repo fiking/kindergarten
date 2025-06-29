@@ -6,6 +6,13 @@
 #include <cstdlib>
 #include <vector>
 
+#define MAPLERT_GC_STRATEGY_RC 1
+#define MAPLERT_GC_STRATEGY_MS 2
+
+#if !defined(MAPLERT_GC_STRATEGY)
+#define MAPLERT_GC_STRATEGY MAPLERT_GC_STRATEGY_MS
+#endif // !defined(MAPLERT_GC_STRATEGY)
+
 namespace maplert {
 // 对象类型定义
 typedef void object_t;
@@ -14,9 +21,12 @@ typedef uintptr_t address_t;
 typedef intptr_t offset_t;
 
 // global GC states
-extern std::vector<objref_t> g_all_objects; // 全局对象列表，用于跟踪所有分配的对象
-extern std::vector<objref_t> g_objects_allocated; 
-extern std::vector<objref_t> g_objects_freed; // 全局已释放对象列表，用于跟踪已释放的对象
+extern std::vector<address_t> g_all_objects; // 全局对象列表，用于跟踪所有分配的对象
+extern std::vector<address_t> g_objects_allocated; 
+extern std::vector<address_t> g_objects_freed; // 全局已释放对象列表，用于跟踪已释放的对象
+
+class FrameCursorFactory;
+extern FrameCursorFactory *g_frame_cursor_factory;
 
 // thread-local GC states
 extern thread_local address_t tl_gc_stack_low_water_mark;

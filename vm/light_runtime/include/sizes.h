@@ -3,13 +3,6 @@
 #include <cstdint>
 #include "memorymanager.h"
 
-#define MAPLERT_GC_STRATEGY_RC 1
-#define MAPLERT_GC_STRATEGY_MS 2
-
-#if !defined(MAPLERT_GC_STRATEGY)
-#define MAPLERT_GC_STRATEGY MAPLERT_GC_STRATEGY_MS
-#endif // !defined(MAPLERT_GC_STRATEGY)
-
 #include <cstddef>
 #include <sys/types.h>
 
@@ -40,6 +33,45 @@ struct GCTIB_GCInfo {
 
 static const offset_t JAVA_ARRAY_CONTENT_OFFSET = 32; // Java数组内容的偏移量
 static const offset_t JAVA_ARRAY_LENGTH_OFFSET = 28; // Java数组长度的偏移量
+
+inline address_t &gctibPtr(address_t objaddr) {
+    return *reinterpret_cast<address_t*>(objaddr + OFFSET_GCTIB_PTR);
+}
+
+inline GCTIB_GCInfo &gcInfo(address_t objaddr) {
+    address_t gctib = gctibPtr(objaddr);
+    uint64_t user_data_size = *reinterpret_cast<uint64_t*>(gctib);
+    return *reinterpret_cast<GCTIB_GCInfo*>(gctib + user_data_size);
+}
+
+inline uint32_t &gcHeader(address_t objaddr) {
+    return *reinterpret_cast<uint32_t*>(objaddr + OFFSET_GC_HEADER);
+}
+
+template<class UnaryFunction>
+inline void forEachRefField(address_t objaddr, UnaryFunction func) {
+    GCTIB_GCInfo &gctibInfo = gcInfo(objaddr);
+    size_t n_bitmap_words = gctibInfo.n_bitmap_words;
+    uint64_t *bitmap_words = gctibInfo.bitmap_words;
+    intptr_t current_word_offset = 0;
+    for (size_t i = 0; i < n_bitmap_words; ++i) {
+        uint64_t bitmap_word = bitmap_words[i];
+        intptr_t current_in_word_offset = 0;
+        while (bitmap_word > 0) {
+            if (bitmap_word & 1) {
+                // This bit is set, indicating a reference to an object
+                uintptr_t current_offset = current_word_offset + current_in_word_offset;
+                address_t child_obj_addr = objaddr + current_offset;
+
+                // Decrement the reference count of the child object
+                func(*reinterpret_cast<address_t*>(child_obj_addr));
+            }
+            bitmap_word >>= 1; // Shift right to check the next bit
+            current_in_word_offset += DWORD_BYTES;
+        }        
+        current_word_offset += DWORD_BYTES * 64; // Move to the next bitmap word
+    }
+}
 #ifdef __cplusplus
 } // namespace maplert
 #endif

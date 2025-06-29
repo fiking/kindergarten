@@ -15,7 +15,7 @@ object_t *mapleRT_newobj(size_t size, size_t align, bool zero) {
     uintptr_t result_addr = alloc_addr + HEADER_ALLOC_SIZE;
     object_t *result_ptr = reinterpret_cast<object_t *>(result_addr);
 
-    g_objects_allocated.push_back(result_ptr); // Track allocated object
+    g_objects_allocated.push_back(result_addr); // Track allocated object
     return result_ptr;
 }
 
@@ -24,7 +24,7 @@ void mapleRT_freeobj(object_t *obj) {
     uintptr_t alloc_addr = obj_addr - HEADER_ALLOC_SIZE; // Adjust back to the original
     object_t *alloca_ptr = reinterpret_cast<object_t *>(alloc_addr);
 
-    g_objects_freed.push_back(alloca_ptr); // Track freed object
+    g_objects_freed.push_back(obj_addr); // Track freed object
     // Free the memory including the header
     free(alloca_ptr);
 }

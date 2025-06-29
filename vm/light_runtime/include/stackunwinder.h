@@ -8,6 +8,8 @@ class FrameCursor;
 class FrameCursorFactory {
 public:
   FrameCursorFactory() = default;
+
+  FrameCursor NewFrameCursor(uintptr_t *regs_addr);
   void InitializeFrameCursor(FrameCursor &cursor, uintptr_t *regs_addr);
 };
 

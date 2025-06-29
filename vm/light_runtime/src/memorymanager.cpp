@@ -1,11 +1,15 @@
 #include "memorymanager.h"
 #include <cstdlib>
+#include "stackunwinder.h"
 
 namespace maplert {
 // global GC states
-std::vector<objref_t> g_all_objects; // 全局对象列表，用于跟踪所有分配的对象
-std::vector<objref_t> g_objects_allocated; 
-std::vector<objref_t> g_objects_freed; // 全局已释放对象列表，用于跟踪已释放的对象
+std::vector<address_t> g_all_objects; // 全局对象列表，用于跟踪所有分配的对象
+std::vector<address_t> g_objects_allocated; 
+std::vector<address_t> g_objects_freed; // 全局已释放对象列表，用于跟踪已释放的对象
+
+static FrameCursorFactory _the_frame_cursor_factory;
+FrameCursorFactory *g_frame_cursor_factory = &_the_frame_cursor_factory;
 
 // thread-local GC states
 thread_local address_t tl_gc_stack_low_water_mark;

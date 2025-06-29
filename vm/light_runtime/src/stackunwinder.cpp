@@ -2,6 +2,12 @@
 #include <cstring>
 
 namespace maplert {
+FrameCursor FrameCursorFactory::NewFrameCursor(uintptr_t *regs_addr) {
+    FrameCursor cursor;
+    InitializeFrameCursor(cursor, regs_addr);
+    return cursor;
+}
+
 void FrameCursorFactory::InitializeFrameCursor(FrameCursor &cursor, uintptr_t *regs_addr) {
     int i;
     AArch64State &state = cursor.state;
