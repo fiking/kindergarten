@@ -1,6 +1,9 @@
 cmake_minimum_required(VERSION 3.10)
 project(light_runtime)
 
+set(CMAKE_CXX_STANDARD 17)
+set(CMAKE_CXX_STANDARD_REQUIRED ON)
+
 enable_language(ASM)
 
 # 包含头文件目录

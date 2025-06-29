@@ -1,5 +1,7 @@
 #ifndef SIZES_H
 #define SIZES_H
+#include <cstdint>
+#include "memorymanager.h"
 
 #define MAPLERT_GC_STRATEGY_RC 1
 #define MAPLERT_GC_STRATEGY_MS 2
@@ -14,7 +16,6 @@
 #ifdef __cplusplus
 namespace maplert {
 #endif
-#include <cstdint>
 
 // 在此处定义与对象/类型大小相关的常量或宏
 // 例如：
@@ -26,7 +27,6 @@ const size_t QWORD_BYTES = 16; // 假设四字大小为16字节
 
 const size_t HEADER_SIZE = DWORD_BYTES * 2; // 假设对象头部大小为两个字
 
-typedef ssize_t offset_t; // 偏移量类型，通常为size_t
 const offset_t OFFSET_GCTIB_PTR = -DWORD_BYTES; // 偏移量指向GC TIB的指针
 const offset_t OFFSET_LOCK = -(DWORD_BYTES + WORD_BYTES);
 const offset_t OFFSET_GC_HEADER = -(DWORD_BYTES * 2); // 偏移量指向引用计数

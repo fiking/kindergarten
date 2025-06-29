@@ -59,4 +59,8 @@ void decChildren(object_t *obj) {
         current_word_offset += DWORD_BYTES * 64; // Move to the next bitmap word
     }
 }
+
+void triggerGC()
+{
+}
 }

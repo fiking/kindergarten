@@ -3,17 +3,10 @@
 #include <string.h>
 
 #include "sizes.h"
+#include "memorymanager.h"
 
 namespace maplert {
 const size_t HEADER_ALLOC_SIZE = HEADER_SIZE; // Placeholder for header allocation size
-
-bool mapleRT_init_allocator_global() {
-    return true;
-}
-
-bool mapleRT_fini_allocator_global() {
-    return true;
-}
 
 object_t *mapleRT_newobj(size_t size, size_t align, bool zero) {
     size_t alloc_size = size + HEADER_ALLOC_SIZE; // Include header size
@@ -31,5 +24,4 @@ void mapleRT_freeobj(object_t *obj) {
     // Free the memory including the header
     free(alloca_ptr);
 }
-
 } // namespace maplert
