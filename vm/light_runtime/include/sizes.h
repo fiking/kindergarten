@@ -27,6 +27,17 @@ const size_t HEADER_SIZE = WORD_SIZE_BYTES; // 对象头部大小为1个字长
 #error "Unsupported GC strategy"
 #endif
 
+typedef ssize_t offset_t; // 偏移量类型，通常为size_t
+const offset_t OFFSET_GCTIB_PTR = -WORD_SIZE_BYTES; // 偏移量指向GC TIB的指针
+const offset_t OFFSET_RC = -WORD_SIZE_BYTES * 2; // 偏移量指向引用计数
+
+struct GCTIB {
+    size_t n_refs; // 引用计数
+    offset_t offsets[]; // 偏移量数组
+};
+
+const offset_t OFFSET_N_REFS = offsetof(GCTIB, n_refs); // 偏移量指向引用计数
+const offset_t OFFSET_OFFSETS = offsetof(GCTIB, offsets); // 偏移量指向偏移量数组
 #ifdef __cplusplus
 } // namespace maplert
 #endif
