@@ -85,7 +85,7 @@ fun expressionWalker(expr : Any?) {
 }
 
 fun main() {
-    val scriptFile = "/Users/bytedance/code/kindergarten/compiler/kotlin_native_early/sum.kt"
+    val scriptFile = "/Users/bytedance/code/kindergarten/compiler/kotlin_native_early/translator_skeletons/sum.kt"
     val parser = KotlinScriptParser()
     val analyzerContext = parser.parse(scriptFile)
 

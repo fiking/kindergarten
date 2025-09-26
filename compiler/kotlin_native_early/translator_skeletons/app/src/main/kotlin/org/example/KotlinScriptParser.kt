@@ -1,11 +1,16 @@
 package org.example
 
 import com.intellij.openapi.util.Disposer
+import org.jetbrains.kotlin.cli.common.CLIConfigurationKeys
 import org.jetbrains.kotlin.cli.common.config.addKotlinSourceRoot
 import org.jetbrains.kotlin.cli.common.config.addKotlinSourceRoots
+import org.jetbrains.kotlin.cli.common.messages.GroupingMessageCollector
+import org.jetbrains.kotlin.cli.common.messages.MessageCollector
 import org.jetbrains.kotlin.cli.jvm.compiler.CliLightClassGenerationSupport
 import org.jetbrains.kotlin.cli.jvm.compiler.EnvironmentConfigFiles
 import org.jetbrains.kotlin.cli.jvm.compiler.KotlinCoreEnvironment
+import org.jetbrains.kotlin.cli.jvm.compiler.KotlinToJVMBytecodeCompiler
+import org.jetbrains.kotlin.cli.jvm.compiler.NoScopeRecordCliBindingTrace
 import org.jetbrains.kotlin.cli.jvm.config.addJvmClasspathRoot
 import org.jetbrains.kotlin.cli.jvm.config.addJvmClasspathRoots
 import org.jetbrains.kotlin.config.CompilerConfiguration
@@ -16,6 +21,13 @@ import org.jetbrains.kotlin.resolve.TopDownAnalysisContext
 import org.jetbrains.kotlin.utils.PathUtil
 import java.io.File
 import org.jetbrains.kotlin.cli.jvm.compiler.TopDownAnalyzerFacadeForJVM
+import org.jetbrains.kotlin.cli.jvm.compiler.TopDownAnalyzerFacadeForJVM.createContainer
+import org.jetbrains.kotlin.config.CommonConfigurationKeys
+import org.jetbrains.kotlin.container.get
+import org.jetbrains.kotlin.resolve.CompilerEnvironment
+import org.jetbrains.kotlin.resolve.LazyTopDownAnalyzer
+import org.jetbrains.kotlin.resolve.TopDownAnalysisMode
+import org.jetbrains.kotlin.resolve.lazy.declarations.FileBasedDeclarationProviderFactory
 import kotlin.script.dependencies.Environment
 
 class KotlinScriptParser {
@@ -30,22 +42,23 @@ class KotlinScriptParser {
         // The Kotlin compiler configuration
         val configuration = CompilerConfiguration()
         configuration.addJvmClasspathRoots(PathUtil.getJdkClassesRootsFromCurrentJre())
-
         // The path to .kt files sources
         files.forEach { configuration.addKotlinSourceRoot(it) }
         // Configuring Kotlin class path
         configuration.addJvmClasspathRoots(classPath)
-       // configuration.put(JVMConfigurationKey, JvmAbi)
-
+        configuration.put(CommonConfigurationKeys.MODULE_NAME, "benchmark")
+        configuration.put(CLIConfigurationKeys.MESSAGE_COLLECTOR_KEY, MessageCollector.NONE)
         val rootDisposable = Disposer.newDisposable()
+
         try {
-//            val environment = KotlinCoreEnvironment.createForProduction(rootDisposable, configuration,
-//                EnvironmentConfigFiles.JVM_CONFIG_FILES)
-//            val ktFiles = environment.getSourceFiles()
-////            val sharedTrace = CliLightClassGenerationSupport
-//            val container = TopDownAnalyzerFacadeForJVM.createContainer()
-//            val additionalProviders = ArrayList<PackageFragmentProvider>()
-            return null
+            val environment = KotlinCoreEnvironment.createForProduction(rootDisposable, configuration,
+                EnvironmentConfigFiles.JVM_CONFIG_FILES)
+            val project = environment.project
+            val sourceFiles = environment.getSourceFiles()
+            val container = TopDownAnalyzerFacadeForJVM.createContainer(
+                project, sourceFiles, NoScopeRecordCliBindingTrace(), configuration, environment::createPackagePartProvider,
+                ::FileBasedDeclarationProviderFactory, CompilerEnvironment)
+            return container.get<LazyTopDownAnalyzer>().analyzeDeclarations(TopDownAnalysisMode.LocalDeclarations, sourceFiles)
         } finally {
             rootDisposable.dispose()
         }
