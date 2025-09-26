@@ -1,28 +1,19 @@
-package org.example
+package org.kotlinnative.translator
 
 import com.intellij.openapi.util.Disposer
 import org.jetbrains.kotlin.cli.common.CLIConfigurationKeys
 import org.jetbrains.kotlin.cli.common.config.addKotlinSourceRoot
-import org.jetbrains.kotlin.cli.common.config.addKotlinSourceRoots
 import org.jetbrains.kotlin.cli.common.messages.CompilerMessageSeverity
 import org.jetbrains.kotlin.cli.common.messages.CompilerMessageSourceLocation
-import org.jetbrains.kotlin.cli.common.messages.GroupingMessageCollector
 import org.jetbrains.kotlin.cli.common.messages.MessageCollector
-import org.jetbrains.kotlin.cli.jvm.compiler.CliLightClassGenerationSupport
 import org.jetbrains.kotlin.cli.jvm.compiler.EnvironmentConfigFiles
 import org.jetbrains.kotlin.cli.jvm.compiler.KotlinCoreEnvironment
-import org.jetbrains.kotlin.cli.jvm.compiler.KotlinToJVMBytecodeCompiler
 import org.jetbrains.kotlin.cli.jvm.compiler.NoScopeRecordCliBindingTrace
-import org.jetbrains.kotlin.cli.jvm.config.addJvmClasspathRoot
 import org.jetbrains.kotlin.cli.jvm.config.addJvmClasspathRoots
 import org.jetbrains.kotlin.config.CompilerConfiguration
-import org.jetbrains.kotlin.config.JVMConfigurationKeys
-import org.jetbrains.kotlin.descriptors.PackageFragmentProvider
-import org.jetbrains.kotlin.load.java.JvmAbi
 import org.jetbrains.kotlin.resolve.TopDownAnalysisContext
 import org.jetbrains.kotlin.utils.PathUtil
 import java.io.File
-import org.jetbrains.kotlin.cli.jvm.compiler.TopDownAnalyzerFacadeForJVM
 import org.jetbrains.kotlin.cli.jvm.compiler.TopDownAnalyzerFacadeForJVM.createContainer
 import org.jetbrains.kotlin.config.CommonConfigurationKeys
 import org.jetbrains.kotlin.container.get
@@ -31,8 +22,6 @@ import org.jetbrains.kotlin.resolve.LazyTopDownAnalyzer
 import org.jetbrains.kotlin.resolve.TopDownAnalysisMode
 import org.jetbrains.kotlin.resolve.lazy.declarations.FileBasedDeclarationProviderFactory
 import org.jetbrains.kotlin.util.DummyLogger
-import org.jetbrains.kotlin.util.Logger
-import kotlin.script.dependencies.Environment
 
 class KotlinScriptParser {
     companion object {
@@ -83,8 +72,8 @@ class KotlinScriptParser {
             val project = environment.project
             val sourceFiles = environment.getSourceFiles()
             // for debug printing
-            // printFile(sourceFiles.first())
-            val container = TopDownAnalyzerFacadeForJVM.createContainer(
+            printFile(sourceFiles.first())
+            val container = createContainer(
                 project, sourceFiles, NoScopeRecordCliBindingTrace(), configuration, environment::createPackagePartProvider,
                 ::FileBasedDeclarationProviderFactory, CompilerEnvironment)
             return container.get<LazyTopDownAnalyzer>().analyzeDeclarations(TopDownAnalysisMode.LocalDeclarations, sourceFiles)

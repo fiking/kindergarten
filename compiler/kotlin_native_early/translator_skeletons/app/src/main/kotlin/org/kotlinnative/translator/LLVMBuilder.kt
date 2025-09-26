@@ -1,4 +1,4 @@
-package org.example
+package org.kotlinnative.translator
 
 class LLVMBuilder {
     private val llvmCode : StringBuilder = StringBuilder()

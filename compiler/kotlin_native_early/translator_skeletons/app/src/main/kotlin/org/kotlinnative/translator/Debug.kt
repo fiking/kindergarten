@@ -1,6 +1,5 @@
-package org.example
+package org.kotlinnative.translator
 
-import com.intellij.lang.ASTNode
 import com.intellij.psi.PsiElement
 import com.intellij.psi.PsiWhiteSpace
 import com.intellij.psi.impl.source.tree.CompositeElement

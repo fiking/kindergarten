@@ -42,7 +42,7 @@ java {
 
 application {
     // Define the main class for the application.
-    mainClass = "org.example.AppKt"
+    mainClass = "org.kotlinnative.translator.AppKt"
 }
 
 tasks.named<Test>("test") {
