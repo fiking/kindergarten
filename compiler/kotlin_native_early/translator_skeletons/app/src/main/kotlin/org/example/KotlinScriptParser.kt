@@ -4,6 +4,8 @@ import com.intellij.openapi.util.Disposer
 import org.jetbrains.kotlin.cli.common.CLIConfigurationKeys
 import org.jetbrains.kotlin.cli.common.config.addKotlinSourceRoot
 import org.jetbrains.kotlin.cli.common.config.addKotlinSourceRoots
+import org.jetbrains.kotlin.cli.common.messages.CompilerMessageSeverity
+import org.jetbrains.kotlin.cli.common.messages.CompilerMessageSourceLocation
 import org.jetbrains.kotlin.cli.common.messages.GroupingMessageCollector
 import org.jetbrains.kotlin.cli.common.messages.MessageCollector
 import org.jetbrains.kotlin.cli.jvm.compiler.CliLightClassGenerationSupport
@@ -28,10 +30,35 @@ import org.jetbrains.kotlin.resolve.CompilerEnvironment
 import org.jetbrains.kotlin.resolve.LazyTopDownAnalyzer
 import org.jetbrains.kotlin.resolve.TopDownAnalysisMode
 import org.jetbrains.kotlin.resolve.lazy.declarations.FileBasedDeclarationProviderFactory
+import org.jetbrains.kotlin.util.DummyLogger
+import org.jetbrains.kotlin.util.Logger
 import kotlin.script.dependencies.Environment
 
 class KotlinScriptParser {
     companion object {
+        private val messageCollector = object : MessageCollector {
+            override fun hasErrors(): Boolean {
+                throw UnsupportedOperationException()
+            }
+
+            override fun report(
+                severity: CompilerMessageSeverity,
+                message: String,
+                location: CompilerMessageSourceLocation?
+            ) {
+                val path = location?.path
+                val position = if (path == null) "" else "$path: (${location.line}, ${location.column})"
+                val text = position + message
+
+                if (CompilerMessageSeverity.VERBOSE.contains(severity)) {
+                    DummyLogger.log(text)
+                }
+            }
+
+            override fun clear() {
+                TODO("Not yet implemented")
+            }
+        }
         private val classPath : ArrayList<File> by lazy {
             val classpath = arrayListOf<File>()
             classpath += PathUtil.getResourcePathForClass(AnnotationTarget.CLASS.javaClass)
@@ -47,7 +74,7 @@ class KotlinScriptParser {
         // Configuring Kotlin class path
         configuration.addJvmClasspathRoots(classPath)
         configuration.put(CommonConfigurationKeys.MODULE_NAME, "benchmark")
-        configuration.put(CLIConfigurationKeys.MESSAGE_COLLECTOR_KEY, MessageCollector.NONE)
+        configuration.put(CLIConfigurationKeys.MESSAGE_COLLECTOR_KEY, messageCollector)
         val rootDisposable = Disposer.newDisposable()
 
         try {
@@ -55,6 +82,8 @@ class KotlinScriptParser {
                 EnvironmentConfigFiles.JVM_CONFIG_FILES)
             val project = environment.project
             val sourceFiles = environment.getSourceFiles()
+            // for debug printing
+            // printFile(sourceFiles.first())
             val container = TopDownAnalyzerFacadeForJVM.createContainer(
                 project, sourceFiles, NoScopeRecordCliBindingTrace(), configuration, environment::createPackagePartProvider,
                 ::FileBasedDeclarationProviderFactory, CompilerEnvironment)
