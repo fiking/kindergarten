@@ -37,7 +37,7 @@ class LLVMBuilder {
         left: LLVMVariable,
         right: LLVMVariable
     ): LLVMVariable {
-        val newVar = getNewVariable(::LLVMIntType)
+        val newVar = getNewVariable(LLVMIntType())
         val llvmExpression = when (operator) {
             KtTokens.PLUS -> left.type!!.operatorPlus(newVar, left, right)
             KtTokens.MINUS -> left.type!!.operatorMinus(newVar, left, right)
@@ -53,8 +53,8 @@ class LLVMBuilder {
         llvmCode.appendLine("$llvmVariable = $assignExpression")
     }
 
-    fun getNewVariable(type: KFunction0<LLVMType>?): LLVMVariable {
+    fun getNewVariable(type: LLVMType?): LLVMVariable {
         variableCount++
-        return LLVMVariable("%var$variableCount", type?.invoke())
+        return LLVMVariable("%var$variableCount", type)
     }
 }
