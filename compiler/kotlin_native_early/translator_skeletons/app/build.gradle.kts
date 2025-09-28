@@ -31,6 +31,7 @@ dependencies {
     implementation(libs.guava)
 
     implementation("org.jetbrains.kotlin:kotlin-compiler:1.9.0")
+    implementation("org.jetbrains.kotlin:kotlin-stdlib:1.9.0")
 }
 
 // Apply a specific Java toolchain to ease working on different environments.
@@ -42,7 +43,7 @@ java {
 
 application {
     // Define the main class for the application.
-    mainClass = "org.kotlinnative.translator.AppKt"
+    mainClass = "MainKt"
 }
 
 tasks.named<Test>("test") {

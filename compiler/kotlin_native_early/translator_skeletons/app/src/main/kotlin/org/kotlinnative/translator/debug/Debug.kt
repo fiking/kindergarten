@@ -1,4 +1,4 @@
-package org.kotlinnative.translator
+package org.kotlinnative.translator.debug
 
 import com.intellij.psi.PsiElement
 import com.intellij.psi.PsiWhiteSpace
