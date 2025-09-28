@@ -39,9 +39,9 @@ class LLVMBuilder {
     ): LLVMVariable {
         val newVar = getNewVariable(::LLVMIntType)
         val llvmOperator = when (operator) {
-            KtTokens.PLUS -> "add nsw i32"
-            KtTokens.MINUS -> "sub nsw i32"
-            KtTokens.MUL -> "mul nsw i32"
+            KtTokens.PLUS -> left.type?.operatorPlus(newVar, left, right)?.generateExpression(this)
+            KtTokens.MINUS -> left.type?.operatorMinus(newVar, left, right)?.generateExpression(this)
+            KtTokens.MUL -> left.type?.operatorTimes(newVar, left, right)?.generateExpression(this)
             else -> throw UnsupportedOperationException("Unkbown binary operator")
         }
 

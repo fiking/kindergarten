@@ -1,5 +1,3 @@
-fun sum() : Int {
-  var a : Int = 2;
-  var b : Int = 3;
-  return a + b;
+fun sum(val a: Int, val b: Int) : Int {
+  return 2 + 3;
 }

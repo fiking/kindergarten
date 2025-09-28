@@ -9,8 +9,10 @@ import org.jetbrains.kotlin.psi.KtBinaryExpression
 import org.jetbrains.kotlin.psi.KtBlockExpression
 import org.jetbrains.kotlin.psi.KtConstantExpression
 import org.jetbrains.kotlin.psi.KtNamedFunction
+import org.jetbrains.kotlin.psi.KtReferenceExpression
 import org.jetbrains.kotlin.psi.psiUtil.getNextSiblingIgnoringWhitespaceAndComments
 import org.jetbrains.kotlin.resolve.BindingContext
+import org.kotlinnative.translator.debug.debugPrintNode
 import org.kotlinnative.translator.llvm.*
 import org.kotlinnative.translator.llvm.types.LLVMIntType
 import org.kotlinnative.translator.utils.FunctionArgument
@@ -31,6 +33,9 @@ class FunctionCodegen(val state: TranslationState, val function: KtNamedFunction
     fun generate() {
         generateDeclaration(function)
         codeBuilder.addStartExpression()
+        println("generate is start")
+        debugPrintNode(function.bodyExpression)
+        println("generate is end")
         expressionWalker(function.bodyExpression)
         codeBuilder.addEndExpression()
     }
@@ -70,6 +75,7 @@ class FunctionCodegen(val state: TranslationState, val function: KtNamedFunction
     }
 
     private fun evaluateBinaryExpression(expr: KtBinaryExpression) : LLVMVariable {
+//        debugPrintNode(expr)
         val left = evaluateExpression(expr.firstChild) ?: throw UnsupportedOperationException("Wrong binary exception")
         val right = evaluateExpression(expr.lastChild) ?: throw UnsupportedOperationException("Wrong binary exception")
         val operator = expr.operationToken
