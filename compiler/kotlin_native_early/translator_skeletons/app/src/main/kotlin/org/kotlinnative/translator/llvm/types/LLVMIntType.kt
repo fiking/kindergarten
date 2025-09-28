@@ -4,6 +4,10 @@ import org.kotlinnative.translator.llvm.LLVMExpression
 import org.kotlinnative.translator.llvm.LLVMVariable
 
 class LLVMIntType() : LLVMType() {
+    override fun toString(): String {
+        return "i32"
+    }
+
     override fun operatorPlus(
         result: LLVMVariable,
         firstOp: LLVMVariable,

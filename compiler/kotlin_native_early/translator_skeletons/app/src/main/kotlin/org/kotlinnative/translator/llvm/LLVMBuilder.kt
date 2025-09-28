@@ -24,6 +24,10 @@ class LLVMBuilder {
         llvmCode = StringBuilder()
     }
 
+    fun addAssignment(llvmVariable: LLVMVariable, rhs: LLVMNode) {
+        llvmCode.appendLine("$llvmVariable = $rhs")
+    }
+
     fun addStartExpression() {
         llvmCode.appendLine("{")
     }
@@ -42,15 +46,11 @@ class LLVMBuilder {
             KtTokens.PLUS -> left.type!!.operatorPlus(newVar, left, right)
             KtTokens.MINUS -> left.type!!.operatorMinus(newVar, left, right)
             KtTokens.MUL -> left.type!!.operatorTimes(newVar, left, right)
-            else -> throw UnsupportedOperationException("Unkbown binary operator")
+            else -> throw UnsupportedOperationException("Unknown binary operator")
         }
 
         addAssignment(newVar, llvmExpression)
         return newVar
-    }
-
-    fun addAssignment(llvmVariable: LLVMNode, assignExpression: LLVMNode) {
-        llvmCode.appendLine("$llvmVariable = $assignExpression")
     }
 
     fun getNewVariable(type: LLVMType?): LLVMVariable {
