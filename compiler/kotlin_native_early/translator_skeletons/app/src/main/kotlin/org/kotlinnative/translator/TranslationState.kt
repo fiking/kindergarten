@@ -28,12 +28,15 @@ import org.jetbrains.kotlin.resolve.BindingContext
 import org.jetbrains.kotlin.utils.PathUtil
 import org.kotlinnative.translator.debug.printFile
 import org.kotlinnative.translator.exceptions.TranslationException
+import org.kotlinnative.translator.utils.FunctionDescriptor
 import java.io.File
 import kotlin.script.dependencies.Environment
 
 class TranslationState(sources: List<String>, disposer: Disposable) {
     val environment: KotlinCoreEnvironment
     val bindingContext: BindingContext?
+    var functions = HashMap<String, FunctionDescriptor>()
+
     private val classPath : ArrayList<File> by lazy {
         val classpath = arrayListOf<File>()
         classpath += PathUtil.getResourcePathForClass(AnnotationTarget.CLASS.javaClass)

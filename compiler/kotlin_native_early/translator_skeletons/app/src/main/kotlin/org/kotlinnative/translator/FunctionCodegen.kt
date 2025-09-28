@@ -12,9 +12,21 @@ import org.jetbrains.kotlin.psi.KtNamedFunction
 import org.jetbrains.kotlin.psi.psiUtil.getNextSiblingIgnoringWhitespaceAndComments
 import org.jetbrains.kotlin.resolve.BindingContext
 import org.kotlinnative.translator.llvm.*
+import org.kotlinnative.translator.utils.FunctionArgument
 
 class FunctionCodegen(val state: TranslationState, val function: KtNamedFunction, val codeBuilder: LLVMBuilder) {
-    private var variableCount = 0;
+    var name = function.fqName.toString()
+    var returnType: String
+    var args: List<FunctionArgument>?
+
+    init {
+        val descriptor = state.bindingContext?.get(BindingContext.FUNCTION,function)
+        args = descriptor?.valueParameters?.map {
+            FunctionArgument(LLVMMapStandardType(it.type.toString()), it.name.toString())
+        }
+        returnType = LLVMMapStandardType(descriptor?.returnType.toString())
+    }
+
     fun generate() {
         generateDeclaration(function)
         codeBuilder.addStartExpression()
@@ -23,12 +35,7 @@ class FunctionCodegen(val state: TranslationState, val function: KtNamedFunction
     }
 
     private fun generateDeclaration(function: KtNamedFunction) {
-        val descriptor = state.bindingContext?.get(BindingContext.FUNCTION, function)
-        var args = descriptor?.valueParameters?.map {
-            Pair(it.name.toString(), LLVMMapStandardType(it.type.toString()))
-        }
-        val returnType = LLVMMapStandardType(descriptor?.returnType.toString())
-        codeBuilder.addLLVMCode(LLVMDescriptorGenearte(function.fqName.toString(), args, returnType))
+        codeBuilder.addLLVMCode(LLVMDescriptorGenearte(name, args, returnType))
     }
 
     private fun expressionWalker(expr : Any?) {
