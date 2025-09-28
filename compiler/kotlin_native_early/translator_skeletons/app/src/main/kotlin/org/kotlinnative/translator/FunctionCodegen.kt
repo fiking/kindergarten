@@ -12,6 +12,7 @@ import org.jetbrains.kotlin.psi.KtNamedFunction
 import org.jetbrains.kotlin.psi.psiUtil.getNextSiblingIgnoringWhitespaceAndComments
 import org.jetbrains.kotlin.resolve.BindingContext
 import org.kotlinnative.translator.llvm.*
+import org.kotlinnative.translator.llvm.types.LLVMIntType
 import org.kotlinnative.translator.utils.FunctionArgument
 
 class FunctionCodegen(val state: TranslationState, val function: KtNamedFunction, val codeBuilder: LLVMBuilder) {
@@ -85,13 +86,13 @@ class FunctionCodegen(val state: TranslationState, val function: KtNamedFunction
     }
 
     private fun evaluateConstantExpression(expr: KtConstantExpression) : LLVMVariable {
-        return LLVMVariable(expr.node.firstChildNode.text)
+        return LLVMVariable(expr.node.firstChildNode.text, ::LLVMIntType.invoke())
     }
 
     private fun evaluateLeafPsiElement(element: LeafPsiElement) : LLVMVariable? {
         return when (element.elementType) {
             KtTokens.RETURN_KEYWORD -> evaluateReturnInstruction(element)
-            else -> LLVMVariable("")
+            else -> null
         }
     }
 
