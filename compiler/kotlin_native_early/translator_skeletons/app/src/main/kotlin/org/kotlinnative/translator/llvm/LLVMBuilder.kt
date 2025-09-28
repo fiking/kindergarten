@@ -61,6 +61,11 @@ class LLVMBuilder {
         llvmCode.appendLine("ret void")
     }
 
+    fun loadVariable(llvmVariable: LLVMVariable) {
+        llvmCode.appendLine("$llvmVariable.addr = alloca ${llvmVariable.type}, align ${llvmVariable.type?.getAlign()}")
+        llvmCode.appendLine("store ${llvmVariable.type} $llvmVariable, ${llvmVariable.type}* ${llvmVariable}.addr, align ${llvmVariable.type?.getAlign()}")
+    }
+
     fun getNewVariable(type: LLVMType?): LLVMVariable {
         variableCount++
         return LLVMVariable("%var$variableCount", type)

@@ -36,6 +36,7 @@ class TranslationState(sources: List<String>, disposer: Disposable) {
     val environment: KotlinCoreEnvironment
     val bindingContext: BindingContext?
     var functions = HashMap<String, FunctionDescriptor>()
+    val variableManager = VariableManager()
 
     private val classPath : ArrayList<File> by lazy {
         val classpath = arrayListOf<File>()
