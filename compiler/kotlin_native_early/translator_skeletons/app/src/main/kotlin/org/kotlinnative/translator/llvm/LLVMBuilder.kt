@@ -38,15 +38,19 @@ class LLVMBuilder {
         right: LLVMVariable
     ): LLVMVariable {
         val newVar = getNewVariable(::LLVMIntType)
-        val llvmOperator = when (operator) {
-            KtTokens.PLUS -> left.type?.operatorPlus(newVar, left, right)?.generateExpression(this)
-            KtTokens.MINUS -> left.type?.operatorMinus(newVar, left, right)?.generateExpression(this)
-            KtTokens.MUL -> left.type?.operatorTimes(newVar, left, right)?.generateExpression(this)
+        val llvmExpression = when (operator) {
+            KtTokens.PLUS -> left.type!!.operatorPlus(newVar, left, right)
+            KtTokens.MINUS -> left.type!!.operatorMinus(newVar, left, right)
+            KtTokens.MUL -> left.type!!.operatorTimes(newVar, left, right)
             else -> throw UnsupportedOperationException("Unkbown binary operator")
         }
 
-        llvmCode.appendLine("$newVar = $llvmOperator $left, $right")
+        addAssignment(newVar, llvmExpression)
         return newVar
+    }
+
+    fun addAssignment(llvmVariable: LLVMNode, assignExpression: LLVMNode) {
+        llvmCode.appendLine("$llvmVariable = $assignExpression")
     }
 
     fun getNewVariable(type: KFunction0<LLVMType>?): LLVMVariable {

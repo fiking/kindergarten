@@ -9,7 +9,7 @@ class LLVMDoubleType() : LLVMType() {
         firstOp: LLVMVariable,
         secondOp: LLVMVariable
     ): LLVMExpression {
-        return LLVMExpression(::LLVMIntType, "fadd double $firstOp, $secondOp")
+        return LLVMExpression(LLVMDoubleType(), "fadd double $firstOp, $secondOp")
     }
 
     override fun operatorTimes(
@@ -17,7 +17,7 @@ class LLVMDoubleType() : LLVMType() {
         firstOp: LLVMVariable,
         secondOp: LLVMVariable
     ): LLVMExpression {
-        return LLVMExpression(::LLVMIntType, "fmul double i32 $firstOp, $secondOp")
+        return LLVMExpression(LLVMDoubleType(), "fmul double i32 $firstOp, $secondOp")
     }
 
     override fun operatorMinus(
@@ -25,6 +25,6 @@ class LLVMDoubleType() : LLVMType() {
         firstOp: LLVMVariable,
         secondOp: LLVMVariable
     ): LLVMExpression {
-        return LLVMExpression(::LLVMIntType, "fsub double i32 $firstOp, $secondOp")
+        return LLVMExpression(LLVMDoubleType(), "fsub double i32 $firstOp, $secondOp")
     }
 }
