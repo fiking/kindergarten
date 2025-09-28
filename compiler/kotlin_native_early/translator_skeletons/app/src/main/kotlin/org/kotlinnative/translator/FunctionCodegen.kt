@@ -35,23 +35,45 @@ class FunctionCodegen(val state: TranslationState, val function: KtNamedFunction
     }
 
     fun generate() {
-        generateDeclaration(function)
+        if (generateDeclaration(function)) {
+            return
+        }
+
         codeBuilder.addStartExpression()
         println("generate is start")
         debugPrintNode(function.bodyExpression)
         println("generate is end")
         expressionWalker(function.bodyExpression)
+
+        if (returnType == "void") {
+            codeBuilder.addVoidReturn()
+        }
+
         codeBuilder.addEndExpression()
     }
 
-    private fun generateDeclaration(function: KtNamedFunction) {
-        codeBuilder.addLLVMCode(LLVMDescriptorGenearte(name, args, returnType))
+    private fun generateDeclaration(function: KtNamedFunction) : Boolean {
+        var external = false
+
+        var keyword = function.firstChild
+        while (keyword != null) {
+            if (keyword.text == "external") {
+                external = true
+                break
+            }
+
+            keyword = keyword.getNextSiblingIgnoringWhitespaceAndComments()
+        }
+
+        codeBuilder.addLLVMCode(LLVMFunctionDescriptor(function.fqName.toString(), args, returnType, external))
+        return external
     }
 
     private fun expressionWalker(expr : PsiElement?) {
         when(expr) {
             is KtBlockExpression -> expressionWalker(expr.firstChild)
             is KtProperty -> evaluateLeafPsiElement(expr.firstChild as LeafPsiElement)
+            is KtCallExpression -> codeBuilder.addLLVMCode(evaluateCallExpression(expr).toString())
             is PsiElement -> evaluateExpression(expr.firstChild)
             null -> return
             else -> UnsupportedOperationException()
