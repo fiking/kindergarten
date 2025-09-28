@@ -53,6 +53,10 @@ class LLVMBuilder {
         return newVar
     }
 
+    fun addReturnOperator(llvmVariable: LLVMVariable) {
+        llvmCode.appendLine("ret i32 $llvmVariable")
+    }
+
     fun getNewVariable(type: LLVMType?): LLVMVariable {
         variableCount++
         return LLVMVariable("%var$variableCount", type)

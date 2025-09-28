@@ -4,6 +4,10 @@ import org.kotlinnative.translator.llvm.LLVMExpression
 import org.kotlinnative.translator.llvm.LLVMVariable
 
 class LLVMDoubleType() : LLVMType() {
+    override fun toString(): String {
+        return "double"
+    }
+
     override fun operatorPlus(
         result: LLVMVariable,
         firstOp: LLVMVariable,
