@@ -46,6 +46,7 @@ class LLVMBuilder {
             KtTokens.PLUS -> left.type!!.operatorPlus(newVar, left, right)
             KtTokens.MINUS -> left.type!!.operatorMinus(newVar, left, right)
             KtTokens.MUL -> left.type!!.operatorTimes(newVar, left, right)
+            KtTokens.EQ -> throw UnsupportedOperationException()
             else -> throw UnsupportedOperationException("Unknown binary operator")
         }
 
@@ -62,8 +63,25 @@ class LLVMBuilder {
     }
 
     fun loadVariable(llvmVariable: LLVMVariable) {
-        llvmCode.appendLine("$llvmVariable.addr = alloca ${llvmVariable.type}, align ${llvmVariable.type?.getAlign()}")
-        llvmCode.appendLine("store ${llvmVariable.type} $llvmVariable, ${llvmVariable.type}* ${llvmVariable}.addr, align ${llvmVariable.type?.getAlign()}")
+        addVariableByRef(llvmVariable, LLVMVariable("${llvmVariable.label}.addr", llvmVariable.type, llvmVariable.kotlinName))
+    }
+
+    fun addVariableByRef(targetVariable: LLVMVariable, sourceVariable: LLVMVariable) {
+        llvmCode.appendLine("$sourceVariable = alloca ${sourceVariable.type}, align ${sourceVariable.type?.getAlign()}")
+        llvmCode.appendLine("store ${targetVariable.type} $targetVariable, ${targetVariable.type}* $sourceVariable, align ${targetVariable.type?.getAlign()}")
+    }
+
+    fun addVariableByValue(targetVariable: LLVMVariable, sourceVariable: LLVMVariable) {
+        val tmp = getNewVariable(targetVariable.type)
+        llvmCode.appendLine("$tmp = alloca ${tmp.type}, align ${tmp.type?.getAlign()}")
+        llvmCode.appendLine("store ${tmp.type} $sourceVariable, ${tmp.type}* $tmp, align ${tmp.type?.getAlign()}")
+        llvmCode.appendLine("$targetVariable = load ${targetVariable.type}, ${targetVariable.type}* tmp, align ${targetVariable.type?.getAlign()}")
+    }
+
+    fun addConstant(sourceVariable: LLVMVariable): LLVMVariable {
+        val target = getNewVariable(sourceVariable.type)
+        addVariableByValue(target, sourceVariable)
+        return target
     }
 
     fun getNewVariable(type: LLVMType?): LLVMVariable {
