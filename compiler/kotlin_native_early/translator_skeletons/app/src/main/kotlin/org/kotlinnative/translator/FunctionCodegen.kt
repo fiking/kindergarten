@@ -3,6 +3,7 @@ package org.kotlinnative.translator
 import com.intellij.psi.PsiElement
 import com.intellij.psi.PsiWhiteSpace
 import com.intellij.psi.impl.source.tree.LeafPsiElement
+import com.intellij.psi.tree.IElementType
 import org.jetbrains.kotlin.lexer.KtTokens
 import org.jetbrains.kotlin.psi.KtBinaryExpression
 import org.jetbrains.kotlin.psi.KtBlockExpression
@@ -16,9 +17,9 @@ class FunctionCodegen(val state: TranslationState, val function: KtNamedFunction
     private var variableCount = 0;
     fun generate() {
         generateDeclaration(function)
-        codeBuilder.addLLVMCode("{")
+        codeBuilder.addStartExpression()
         expressionWalker(function.bodyExpression)
-        codeBuilder.addLLVMCode("}")
+        codeBuilder.addEndExpression()
     }
 
     private fun generateDeclaration(function: KtNamedFunction) {
@@ -61,20 +62,10 @@ class FunctionCodegen(val state: TranslationState, val function: KtNamedFunction
     }
 
     private fun evaluateBinaryExpression(expr: KtBinaryExpression) : LLVMVariable {
-        val left = evaluateExpression(expr.firstChild)
-        val right = evaluateExpression(expr.lastChild)
+        val left = evaluateExpression(expr.firstChild) ?: throw UnsupportedOperationException("Wrong binary exception")
+        val right = evaluateExpression(expr.lastChild) ?: throw UnsupportedOperationException("Wrong binary exception")
         val operator = expr.operationToken
-
-        val llvmOperator = when (operator) {
-            KtTokens.PLUS -> "add nsw i32"
-            KtTokens.MINUS -> "sub nsw i32"
-            KtTokens.MUL -> "mul nsw i32"
-            else -> throw UnsupportedOperationException()
-        }
-
-        variableCount++
-        codeBuilder.addLLVMCode("%var${variableCount} = $llvmOperator ${left?.label}, ${right?.label}")
-        return LLVMVariable("%var${variableCount}")
+        return codeBuilder.addPrimitiveBinaryOperation(operator, left, right)
     }
 
     private fun evaluatePsiElement(element: PsiElement) : LLVMVariable? {

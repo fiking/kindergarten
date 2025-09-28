@@ -6,11 +6,9 @@ import org.kotlinnative.translator.llvm.LLVMBuilder
 
 class FileTranslator(val state: TranslationState, val file: KtFile) {
     private var codeBuilder = LLVMBuilder()
-    private var compiled = false;
     fun generateCode(): String {
-        if (!compiled) generateFileBody()
-
-        compiled = true
+        codeBuilder.clean()
+        generateFileBody()
         return codeBuilder.toString()
     }
 
