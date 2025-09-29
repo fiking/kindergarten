@@ -1,5 +1,6 @@
 package org.kotlinnative.translator
 
+import org.jetbrains.kotlin.psi.KtClass
 import org.jetbrains.kotlin.psi.KtFile
 import org.jetbrains.kotlin.psi.KtNamedFunction
 import org.kotlinnative.translator.llvm.LLVMBuilder
@@ -24,6 +25,9 @@ class FileTranslator(val state: TranslationState, val file: KtFile) {
                     )
                     )
                     function.generate()
+                }
+                is KtClass -> {
+                    ClassCodeGen(state, declaration, codeBuilder).generate()
                 }
             }
         }

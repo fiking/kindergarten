@@ -39,7 +39,7 @@ class FunctionCodegen(val state: TranslationState, val function: KtNamedFunction
     }
 
     fun generate() {
-        if (generateDeclaration(function)) {
+        if (generateDeclaration()) {
             return
         }
 
@@ -65,7 +65,7 @@ class FunctionCodegen(val state: TranslationState, val function: KtNamedFunction
         }
     }
 
-    private fun generateDeclaration(function: KtNamedFunction) : Boolean {
+    private fun generateDeclaration() : Boolean {
         var external = false
 
         var keyword = function.firstChild
@@ -187,7 +187,7 @@ class FunctionCodegen(val state: TranslationState, val function: KtNamedFunction
     }
 
     fun evaluateReturnInstruction(element: LeafPsiElement, scopeDepth: Int) : LLVMVariable? {
-        var next = element.getNextSiblingIgnoringWhitespaceAndComments()
+        val next = element.getNextSiblingIgnoringWhitespaceAndComments()
         val retVar = evaluateExpression(next, scopeDepth) as LLVMVariable
         codeBuilder.addReturnOperator(retVar)
         return null

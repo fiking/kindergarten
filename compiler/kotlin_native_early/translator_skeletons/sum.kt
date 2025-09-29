@@ -1,3 +1,5 @@
+class MyClass(val a: Int)
+
 fun callee(val a: Int, val b: Int) {
 }
 

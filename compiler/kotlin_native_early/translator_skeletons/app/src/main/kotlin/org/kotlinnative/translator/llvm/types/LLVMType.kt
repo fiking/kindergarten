@@ -10,11 +10,13 @@ abstract class LLVMType {
     open fun operatorTimes(result: LLVMVariable, firstOp: LLVMVariable, secondOp: LLVMVariable) : LLVMExpression = throw UnimplementedException()
     open fun operatorMinus(result: LLVMVariable, firstOp: LLVMVariable, secondOp: LLVMVariable) : LLVMExpression = throw UnimplementedException()
 
-    abstract fun getAlign(): Int
+    open fun getAlign(): Int = throw UnimplementedException()
 }
 
 fun parseLLVMType(type: String): LLVMType = when(type) {
     "i32" -> LLVMIntType()
+    "i16" -> LLVMShortType()
+    "i8" -> LLVMCharType()
     "Unit" -> LLVMVoidType()
     else -> throw TranslationException()
 }

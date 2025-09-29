@@ -16,9 +16,7 @@ class LLVMBuilder {
         llvmCode.appendLine(code)
     }
 
-    override fun toString(): String {
-        return llvmCode.toString()
-    }
+    override fun toString(): String = llvmCode.toString()
 
     fun clean() {
         llvmCode = StringBuilder()
@@ -82,6 +80,11 @@ class LLVMBuilder {
         val target = getNewVariable(sourceVariable.type)
         addVariableByValue(target, sourceVariable)
         return target
+    }
+
+    fun createClass(name: String, fields: List<LLVMVariable>) {
+        val code = "@class.$name = type { ${ fields.map { it.type }.joinToString() } }"
+        llvmCode.appendLine(code)
     }
 
     fun getNewVariable(type: LLVMType?): LLVMVariable {
