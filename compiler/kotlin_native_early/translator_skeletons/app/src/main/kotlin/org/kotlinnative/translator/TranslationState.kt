@@ -51,9 +51,7 @@ class TranslationState(sources: List<String>, disposer: Disposable) {
                 TODO("Not yet implemented")
             }
 
-            override fun hasErrors(): Boolean {
-                return hasError
-            }
+            override fun hasErrors(): Boolean = hasError
 
             override fun report(
                 severity: CompilerMessageSeverity,

@@ -5,9 +5,7 @@ import org.kotlinnative.translator.llvm.LLVMVariable
 
 class LLVMReferenceType(val type: String) : LLVMType() {
     override fun toString(): String = type
-    override fun getAlign(): Int {
-        throw UnsupportedOperationException("not implemented")
-    }
+    override val align: Int = -1
 
     override fun operatorPlus(
         result: LLVMVariable,

@@ -2,6 +2,7 @@ package org.kotlinnative.translator.llvm
 
 import com.intellij.psi.tree.IElementType
 import org.jetbrains.kotlin.lexer.KtTokens
+import org.jetbrains.kotlin.types.ConstantValueKind
 import org.kotlinnative.translator.llvm.types.LLVMIntType
 import org.kotlinnative.translator.llvm.types.LLVMType
 import kotlin.reflect.KFunction0
@@ -44,7 +45,7 @@ class LLVMBuilder {
             KtTokens.PLUS -> left.type!!.operatorPlus(newVar, left, right)
             KtTokens.MINUS -> left.type!!.operatorMinus(newVar, left, right)
             KtTokens.MUL -> left.type!!.operatorTimes(newVar, left, right)
-            KtTokens.EQ -> throw UnsupportedOperationException()
+            KtTokens.EQ -> return moveVariableValue(left, right)
             else -> throw UnsupportedOperationException("Unknown binary operator")
         }
 
@@ -53,7 +54,7 @@ class LLVMBuilder {
     }
 
     fun addReturnOperator(llvmVariable: LLVMVariable) {
-        llvmCode.appendLine("ret i32 $llvmVariable")
+        llvmCode.appendLine("ret ${llvmVariable.type} $llvmVariable")
     }
 
     fun addVoidReturn() {
@@ -61,23 +62,23 @@ class LLVMBuilder {
     }
 
     fun loadVariable(llvmVariable: LLVMVariable) {
-        addVariableByRef(llvmVariable, LLVMVariable("${llvmVariable.label}.addr", llvmVariable.type, llvmVariable.kotlinName))
+        addVariableByRef(llvmVariable, LLVMVariable("${llvmVariable.label}.addr", llvmVariable.type, llvmVariable.kotlinName, true))
     }
 
     fun addVariableByRef(targetVariable: LLVMVariable, sourceVariable: LLVMVariable) {
-        llvmCode.appendLine("$sourceVariable = alloca ${sourceVariable.type}, align ${sourceVariable.type?.getAlign()}")
-        llvmCode.appendLine("store ${targetVariable.type} $targetVariable, ${targetVariable.type}* $sourceVariable, align ${targetVariable.type?.getAlign()}")
+        llvmCode.appendLine("$sourceVariable = alloca ${sourceVariable.type}, align ${sourceVariable.type?.align}")
+        llvmCode.appendLine("store ${targetVariable.type} $targetVariable, ${targetVariable.type}* $sourceVariable, align ${targetVariable.type?.align}")
     }
 
     fun addVariableByValue(targetVariable: LLVMVariable, sourceVariable: LLVMVariable) {
-        val tmp = getNewVariable(targetVariable.type)
-        llvmCode.appendLine("$tmp = alloca ${tmp.type}, align ${tmp.type?.getAlign()}")
-        llvmCode.appendLine("store ${tmp.type} $sourceVariable, ${tmp.type}* $tmp, align ${tmp.type?.getAlign()}")
-        llvmCode.appendLine("$targetVariable = load ${targetVariable.type}, ${targetVariable.type}* tmp, align ${targetVariable.type?.getAlign()}")
+        val tmp = getNewVariable(targetVariable.type, pointer = true)
+        llvmCode.appendLine("$tmp = alloca ${tmp.type}, align ${tmp.type?.align}")
+        llvmCode.appendLine("store ${tmp.type} $sourceVariable, ${tmp.type}* $tmp, align ${tmp.type?.align}")
+        llvmCode.appendLine("$targetVariable = load ${targetVariable.type}, ${targetVariable.type}* tmp, align ${targetVariable.type?.align}")
     }
 
     fun addConstant(sourceVariable: LLVMVariable): LLVMVariable {
-        val target = getNewVariable(sourceVariable.type)
+        val target = getNewVariable(sourceVariable.type, pointer = sourceVariable.pointer)
         addVariableByValue(target, sourceVariable)
         return target
     }
@@ -87,8 +88,13 @@ class LLVMBuilder {
         llvmCode.appendLine(code)
     }
 
-    fun getNewVariable(type: LLVMType?): LLVMVariable {
+    fun getNewVariable(type: LLVMType?, pointer: Boolean = false): LLVMVariable {
         variableCount++
-        return LLVMVariable("%var$variableCount", type)
+        return LLVMVariable("%var$variableCount", type, pointer = pointer)
+    }
+
+    private fun moveVariableValue(from: LLVMVariable, to: LLVMVariable) : LLVMVariable {
+        llvmCode.appendLine("VARIABLE from $from To $to")
+        return from
     }
 }
