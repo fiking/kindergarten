@@ -6,6 +6,7 @@ import org.kotlinnative.translator.llvm.LLVMVariable
 class LLVMIntType() : LLVMType() {
     override fun toString(): String = "i32"
     override val align: Int = 4
+    override val size: Byte = 4
 
     override fun operatorPlus(
         result: LLVMVariable,

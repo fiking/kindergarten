@@ -35,7 +35,8 @@ import kotlin.script.dependencies.Environment
 class TranslationState(sources: List<String>, disposer: Disposable) {
     val environment: KotlinCoreEnvironment
     val bindingContext: BindingContext?
-    var functions = HashMap<String, FunctionDescriptor>()
+    var functions = HashMap<String, FunctionCodegen>()
+    var classes = HashMap<String, ClassCodeGen>()
     val variableManager = VariableManager()
 
     private val classPath : ArrayList<File> by lazy {

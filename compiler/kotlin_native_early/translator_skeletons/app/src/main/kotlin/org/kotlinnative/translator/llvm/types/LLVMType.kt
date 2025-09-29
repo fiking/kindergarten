@@ -1,6 +1,5 @@
 package org.kotlinnative.translator.llvm.types
 
-import org.kotlinnative.translator.exceptions.TranslationException
 import org.kotlinnative.translator.exceptions.UnimplementedException
 import org.kotlinnative.translator.llvm.LLVMExpression
 import org.kotlinnative.translator.llvm.LLVMVariable
@@ -11,6 +10,7 @@ abstract class LLVMType {
     open fun operatorMinus(result: LLVMVariable, firstOp: LLVMVariable, secondOp: LLVMVariable) : LLVMExpression = throw UnimplementedException()
 
     abstract val align: Int
+    abstract val size: Byte
 }
 
 fun parseLLVMType(type: String): LLVMType = when(type) {
@@ -18,5 +18,5 @@ fun parseLLVMType(type: String): LLVMType = when(type) {
     "i16" -> LLVMShortType()
     "i8" -> LLVMCharType()
     "Unit" -> LLVMVoidType()
-    else -> throw TranslationException()
+    else -> LLVMReferenceType(type)
 }

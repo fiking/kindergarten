@@ -27,13 +27,13 @@ import kotlin.math.exp
 class FunctionCodegen(val state: TranslationState, val function: KtNamedFunction, val codeBuilder: LLVMBuilder) {
     var name = function.fqName.toString()
     var returnType: LLVMType
-    var args: List<FunctionArgument>?
+    var args: List<LLVMVariable>?
     val variableManager = state.variableManager
 
     init {
         val descriptor = state.bindingContext?.get(BindingContext.FUNCTION,function)
         args = descriptor?.valueParameters?.map {
-            FunctionArgument(LLVMMapStandardType(it.type.toString()), it.name.toString())
+            LLVMVariable(it.name.toString(), LLVMMapStandardType(it.type.toString()))
         }
         returnType = LLVMMapStandardType(descriptor?.returnType.toString())
     }
@@ -47,7 +47,7 @@ class FunctionCodegen(val state: TranslationState, val function: KtNamedFunction
         println("generate is start")
         debugPrintNode(function.bodyExpression)
         println("generate is end")
-        generateLoadArguments(function)
+        generateLoadArguments()
         expressionWalker(function.bodyExpression)
 
         if (returnType is LLVMVoidType) {
@@ -57,11 +57,11 @@ class FunctionCodegen(val state: TranslationState, val function: KtNamedFunction
         codeBuilder.addEndExpression()
     }
 
-    private fun generateLoadArguments(function: KtNamedFunction) {
+    private fun generateLoadArguments() {
         args?.forEach {
-            val loadVariable = LLVMVariable("%{it.name}", it.type, it.name)
+            val loadVariable = LLVMVariable("%{it.label}", it.type, it.label, true)
             codeBuilder.loadVariable(loadVariable)
-            variableManager.addVariable(it.name, loadVariable, 2)
+            variableManager.addVariable(it.label, loadVariable, 2)
         }
     }
 
@@ -116,6 +116,21 @@ class FunctionCodegen(val state: TranslationState, val function: KtNamedFunction
     }
 
     private fun evaluateCallExpression(expr: KtCallExpression): LLVMNode? {
+        val function = expr.firstChild.firstChild.text
+        if (state.functions.containsKey(function)) {
+            return evaluateFunctionCallExpression(expr)
+        }
+        if (state.classes.containsKey(function)) {
+            return evaluateConstructorCallExpression(expr)
+        }
+        return null
+    }
+
+    private fun evaluateConstructorCallExpression(expr: KtCallExpression): LLVMNode? {
+        return null
+    }
+
+    private fun evaluateFunctionCallExpression(expr: KtCallExpression): LLVMNode? {
         val function = expr.firstChild.firstChild
         val descriptor = state.functions[function.text] ?: return null
         val names = parseArgList(expr
@@ -123,7 +138,7 @@ class FunctionCodegen(val state: TranslationState, val function: KtNamedFunction
             .getNextSiblingIgnoringWhitespaceAndComments()
             ?.firstChild)
 
-        return LLVMCall(descriptor.returnType, "@${function.text}", descriptor.argTypes.mapIndexed { i: Int, type: LLVMType -> LLVMVariable(names[i], type) })
+        return LLVMCall(descriptor.returnType, "@${function.text}", descriptor.args?.mapIndexed { i: Int, variable: LLVMVariable -> LLVMVariable(names[i], variable.type) } ?: listOf())
     }
 
     private fun parseArgList(argumentList: PsiElement?): List<String> {
@@ -159,8 +174,7 @@ class FunctionCodegen(val state: TranslationState, val function: KtNamedFunction
     }
 
     private fun evaluateConstantExpression(expr: KtConstantExpression) : LLVMVariable {
-        return LLVMVariable(expr.node.firstChildNode.text, ::LLVMIntType.invoke())
-        return codeBuilder.addConstant(LLVMVariable(expr.node.firstChildNode.text, LLVMIntType()))
+        return codeBuilder.addConstant(LLVMVariable(expr.node.firstChildNode.text, LLVMIntType(), pointer = false))
     }
 
     private fun evaluateLeafPsiElement(element: LeafPsiElement, scopeDepth: Int) : LLVMVariable? {
@@ -178,11 +192,13 @@ class FunctionCodegen(val state: TranslationState, val function: KtNamedFunction
         val assignExpression = evaluateExpression(eq.getNextSiblingIgnoringWhitespaceAndComments(), scopeDepth) ?: return null
         when (assignExpression) {
             is LLVMVariable -> {
-                variableManager.addVariable(identifier!!.text, assignExpression, scopeDepth)
+                assignExpression.kotlinName = identifier.text
+                assignExpression.pointer = false
+                variableManager.addVariable(identifier.text, assignExpression, scopeDepth)
                 return null
             }
         }
-        codeBuilder.addAssignment(LLVMVariable("%${identifier!!.text}", null, identifier.text), assignExpression)
+        codeBuilder.addAssignment(LLVMVariable("%${identifier.text}", null, identifier.text), assignExpression)
         return null
     }
 

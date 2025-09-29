@@ -19,17 +19,20 @@ class FileTranslator(val state: TranslationState, val file: KtFile) {
             when (declaration) {
                 is KtNamedFunction -> {
                     val function = FunctionCodegen(state, declaration, codeBuilder)
-                    state.functions.put(function.name, FunctionDescriptor(
-                        function.returnType,
-                        function.args?.map { it.type }?.toList() ?: listOf()
-                    )
-                    )
-                    function.generate()
+                    state.functions.put(function.name, function)
                 }
                 is KtClass -> {
-                    ClassCodeGen(state, declaration, codeBuilder).generate()
+                    val classCodeGen = ClassCodeGen(state, declaration, codeBuilder)
+                    state.classes.put(declaration.name!!, classCodeGen)
                 }
             }
+        }
+
+        for (clazz in state.classes.values) {
+            clazz.generate()
+        }
+        for (function in state.functions.values) {
+            function.generate()
         }
     }
 }

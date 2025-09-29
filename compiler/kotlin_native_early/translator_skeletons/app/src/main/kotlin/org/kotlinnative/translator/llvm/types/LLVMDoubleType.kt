@@ -6,6 +6,7 @@ import org.kotlinnative.translator.llvm.LLVMVariable
 class LLVMDoubleType() : LLVMType() {
     override fun toString(): String = "double"
     override val align: Int = 8
+    override val size: Byte = 8
 
     override fun operatorPlus(
         result: LLVMVariable,
