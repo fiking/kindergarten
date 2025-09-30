@@ -2,6 +2,7 @@ package org.kotlinnative.translator.llvm
 
 import com.intellij.psi.tree.IElementType
 import org.jetbrains.kotlin.lexer.KtTokens
+import org.jetbrains.kotlin.psi.addRemoveModifier.sortModifiers
 import org.jetbrains.kotlin.types.ConstantValueKind
 import org.kotlinnative.translator.llvm.types.LLVMIntType
 import org.kotlinnative.translator.llvm.types.LLVMType
@@ -37,22 +38,42 @@ class LLVMBuilder {
 
     fun addPrimitiveBinaryOperation(
         operator: IElementType,
-        left: LLVMVariable,
-        right: LLVMVariable
+        resultOp: LLVMVariable,
+        left: LLVMSingleValue,
+        right: LLVMSingleValue
     ): LLVMVariable {
-        val newVar = getNewVariable(LLVMIntType())
+        val leftNativeOp = receiveNativeValue(left)
+        val rightNativeOp = receiveNativeValue(right)
         val llvmExpression = when (operator) {
-            KtTokens.PLUS -> left.type!!.operatorPlus(newVar, left, right)
-            KtTokens.MINUS -> left.type!!.operatorMinus(newVar, left, right)
-            KtTokens.MUL -> left.type!!.operatorTimes(newVar, left, right)
+            KtTokens.PLUS -> left.type!!.operatorPlus(resultOp, leftNativeOp, rightNativeOp)
+            KtTokens.MINUS -> left.type!!.operatorMinus(resultOp, leftNativeOp, rightNativeOp)
+            KtTokens.MUL -> left.type!!.operatorTimes(resultOp, leftNativeOp, rightNativeOp)
+            KtTokens.EQ -> return resultOp
             else -> throw UnsupportedOperationException("Unknown binary operator")
         }
 
-        addAssignment(newVar, llvmExpression)
-        return newVar
+        addAssignment(resultOp, llvmExpression)
+        return resultOp
     }
 
-    fun addReturnOperator(llvmVariable: LLVMVariable) {
+    fun receiveNativeValue(firstOp: LLVMSingleValue) = when (firstOp) {
+        is LLVMConstant -> firstOp
+        is LLVMVariable -> when (firstOp.pointer) {
+            false -> firstOp
+            else -> loadAndGetVariable(firstOp)
+        }
+        else -> throw UnsupportedOperationException()
+    }
+
+    fun loadAndGetVariable(source: LLVMVariable) : LLVMVariable {
+        assert(!source.pointer)
+        val target = getNewVariable(type = source.type, pointer = source.pointer, kotlinName = source.kotlinName)
+        val code = "$target = load ${target.type}, ${source.type} $source, align ${target.type?.align!!}"
+        llvmCode.appendLine(code)
+        return target
+    }
+
+    fun addReturnOperator(llvmVariable: LLVMSingleValue) {
         llvmCode.appendLine("ret ${llvmVariable.type} $llvmVariable")
     }
 
@@ -85,17 +106,15 @@ class LLVMBuilder {
         }
     }
 
-    fun addVariableByValue(targetVariable: LLVMVariable, sourceVariable: LLVMVariable) {
-        val tmp = getNewVariable(targetVariable.type, true)
-        llvmCode.appendLine("$tmp = alloca ${tmp.type}, align ${tmp.type?.align}")
-        llvmCode.appendLine("store ${tmp.type} $sourceVariable, ${tmp.type}* $tmp, align ${tmp.type?.align}")
+    fun addVariableByValue(targetVariable: LLVMVariable, sourceVariable: LLVMVariable, allocVariable: LLVMVariable) {
+        llvmCode.appendLine("$allocVariable = alloca ${allocVariable.type}, align ${allocVariable.type?.align}")
+        llvmCode.appendLine("store ${allocVariable.type} $sourceVariable, ${allocVariable.type}* $allocVariable, align ${allocVariable.type?.align}")
         llvmCode.appendLine("$targetVariable = load ${targetVariable.type}, ${targetVariable.type}* tmp, align ${targetVariable.type?.align}")
     }
 
-    fun addConstant(sourceVariable: LLVMVariable): LLVMVariable {
-        val target = getNewVariable(sourceVariable.type, sourceVariable.pointer)
-        addVariableByValue(target, sourceVariable)
-        return target
+    fun addConstant(allocVariable: LLVMVariable, constantValue: LLVMConstant) {
+        llvmCode.appendLine("$allocVariable   = alloca ${allocVariable.type}, align ${allocVariable.type?.align}")
+        llvmCode.appendLine("store ${allocVariable.type} $constantValue, ${allocVariable.getType()} $allocVariable, align ${allocVariable.type?.align}")
     }
 
     fun createClass(name: String, fields: List<LLVMVariable>) {
@@ -115,9 +134,9 @@ class LLVMBuilder {
         llvmCode.appendLine(code)
     }
 
-    fun getNewVariable(type: LLVMType?, pointer: Boolean = false): LLVMVariable {
+    fun getNewVariable(type: LLVMType?, pointer: Boolean = false, kotlinName: String? = null): LLVMVariable {
         variableCount++
-        return LLVMVariable("%var$variableCount", type, "", pointer = pointer)
+        return LLVMVariable("%var$variableCount", type, kotlinName, pointer = pointer)
     }
 
 }
