@@ -32,78 +32,84 @@ import org.kotlinnative.translator.utils.FunctionDescriptor
 import java.io.File
 import kotlin.script.dependencies.Environment
 
-class TranslationState(sources: List<String>, disposer: Disposable) {
-    val environment: KotlinCoreEnvironment
+class TranslationState(
+    val environment: KotlinCoreEnvironment,
     val bindingContext: BindingContext?
+) {
     var functions = HashMap<String, FunctionCodegen>()
     var classes = HashMap<String, ClassCodeGen>()
     val variableManager = VariableManager()
+}
 
-    private val classPath : ArrayList<File> by lazy {
-        val classpath = arrayListOf<File>()
-        classpath += PathUtil.getResourcePathForClass(AnnotationTarget.CLASS.javaClass)
-        classpath
-    }
-    init {
-        val configuration = CompilerConfiguration()
-        val messageCollector = GroupingMessageCollector(object : MessageCollector {
-            private var hasError = false
-            override fun clear() {
-                TODO("Not yet implemented")
-            }
+//    private val classPath : ArrayList<File> by lazy {
+//        val classpath = arrayListOf<File>()
+//        classpath += PathUtil.getResourcePathForClass(AnnotationTarget.CLASS.javaClass)
+//        classpath
+//    }
+fun parseAndAnalyze(sources: List<String>, disposer: Disposable): TranslationState {
+    val configuration = CompilerConfiguration()
+    val messageCollector = GroupingMessageCollector(object : MessageCollector {
+        private var hasError = false
+        override fun clear() {
+            TODO("Not yet implemented")
+        }
 
-            override fun hasErrors(): Boolean = hasError
+        override fun hasErrors(): Boolean = hasError
 
-            override fun report(
-                severity: CompilerMessageSeverity,
-                message: String,
-                location: CompilerMessageSourceLocation?
-            ) {
-                println("[report] $message")
-                hasError = severity.isError || hasError
-            }
-        }, false)
-        configuration.put(CLIConfigurationKeys.MESSAGE_COLLECTOR_KEY, messageCollector)
-        configuration.put(CommonConfigurationKeys.MODULE_NAME, "benchmark")
-        configuration.addKotlinSourceRoots(sources)
+        override fun report(
+            severity: CompilerMessageSeverity,
+            message: String,
+            location: CompilerMessageSourceLocation?
+        ) {
+            println("[report] $message")
+            hasError = severity.isError || hasError
+        }
+    }, false)
+    configuration.put(CLIConfigurationKeys.MESSAGE_COLLECTOR_KEY, messageCollector)
+    configuration.put(CommonConfigurationKeys.MODULE_NAME, "benchmark")
+    configuration.addKotlinSourceRoots(sources)
 
-        environment = KotlinCoreEnvironment.createForProduction(disposer, configuration,
-            EnvironmentConfigFiles.JVM_CONFIG_FILES)
-        bindingContext = analyze(environment)?.bindingContext //?: throw TranslationException()
-    }
+    val environment = KotlinCoreEnvironment.createForProduction(
+        disposer, configuration,
+        EnvironmentConfigFiles.JVM_CONFIG_FILES
+    )
+    val bindingContext = analyze(environment)?.bindingContext //?: throw TranslationException()
+    return TranslationState(environment, bindingContext)
+}
 
-    fun analyze(environment: KotlinCoreEnvironment) : AnalysisResult? {
-        val collector = environment.configuration.getNotNull(CLIConfigurationKeys.MESSAGE_COLLECTOR_KEY)
-        val resolvedKlibs = environment.configuration.get(JVMConfigurationKeys.KLIB_PATHS)?.let { klibPaths ->
+fun analyze(environment: KotlinCoreEnvironment): AnalysisResult? {
+    val collector = environment.configuration.getNotNull(CLIConfigurationKeys.MESSAGE_COLLECTOR_KEY)
+    val resolvedKlibs =
+        environment.configuration.get(JVMConfigurationKeys.KLIB_PATHS)?.let { klibPaths ->
             jvmResolveLibraries(klibPaths, collector.toLogger())
         }?.getFullList() ?: emptyList()
 
-        val analyzerWithCompilerReport = AnalyzerWithCompilerReport(environment.configuration)
-        analyzerWithCompilerReport.analyzeAndReport(environment.getSourceFiles()) {
-            val project = environment.project
-            val sourceFiles = environment.getSourceFiles()
-            val sourcesOnly = TopDownAnalyzerFacadeForJVM.newModuleSearchScope(project, sourceFiles)
-            val moduleOutputs = environment.configuration.get(JVMConfigurationKeys.MODULES)?.mapNotNullTo(hashSetOf()) { module ->
+    val analyzerWithCompilerReport = AnalyzerWithCompilerReport(environment.configuration)
+    analyzerWithCompilerReport.analyzeAndReport(environment.getSourceFiles()) {
+        val project = environment.project
+        val sourceFiles = environment.getSourceFiles()
+        val sourcesOnly = TopDownAnalyzerFacadeForJVM.newModuleSearchScope(project, sourceFiles)
+        val moduleOutputs = environment.configuration.get(JVMConfigurationKeys.MODULES)
+            ?.mapNotNullTo(hashSetOf()) { module ->
                 environment.findLocalFile(module.getOutputDirectory())
             }.orEmpty()
-            val scope = if (moduleOutputs.isEmpty()) sourcesOnly else sourcesOnly.uniteWith(
-                KotlinToJVMBytecodeCompiler.DirectoriesScope(project, moduleOutputs)
-            )
+        val scope = if (moduleOutputs.isEmpty()) sourcesOnly else sourcesOnly.uniteWith(
+            KotlinToJVMBytecodeCompiler.DirectoriesScope(project, moduleOutputs)
+        )
 //            printFile(sourceFiles.first())
-            TopDownAnalyzerFacadeForJVM.analyzeFilesWithJavaIntegration(
-                project,
-                sourceFiles,
-                NoScopeRecordCliBindingTrace(),
-                environment.configuration,
-                environment::createPackagePartProvider,
-                sourceModuleSearchScope = scope,
-                klibList = resolvedKlibs
-            )
-        }
-        val analysisResult = analyzerWithCompilerReport.analysisResult
-        return if (!analyzerWithCompilerReport.hasErrors())
-            analysisResult
-        else
-            null
+        TopDownAnalyzerFacadeForJVM.analyzeFilesWithJavaIntegration(
+            project,
+            sourceFiles,
+            NoScopeRecordCliBindingTrace(),
+            environment.configuration,
+            environment::createPackagePartProvider,
+            sourceModuleSearchScope = scope,
+            klibList = resolvedKlibs
+        )
     }
+    val analysisResult = analyzerWithCompilerReport.analysisResult
+    return if (!analyzerWithCompilerReport.hasErrors())
+        analysisResult
+    else
+        null
 }
