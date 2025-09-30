@@ -48,6 +48,8 @@ class LLVMBuilder {
             KtTokens.PLUS -> left.type!!.operatorPlus(resultOp, leftNativeOp, rightNativeOp)
             KtTokens.MINUS -> left.type!!.operatorMinus(resultOp, leftNativeOp, rightNativeOp)
             KtTokens.MUL -> left.type!!.operatorTimes(resultOp, leftNativeOp, rightNativeOp)
+            KtTokens.EQEQ -> left.type!!.operatorEq(resultOp, leftNativeOp, rightNativeOp)
+
             KtTokens.EQ -> {
                 val result = leftNativeOp as LLVMVariable
                 storeVariable(result, rightNativeOp)
@@ -108,12 +110,6 @@ class LLVMBuilder {
         if (store) {
             llvmCode.appendLine("store ${sourceVariable.type} $sourceVariable, ${targetVariable.type}* $targetVariable, align ${targetVariable.type?.align}")
         }
-    }
-
-    fun addVariableByValue(targetVariable: LLVMVariable, sourceVariable: LLVMVariable, allocVariable: LLVMVariable) {
-        llvmCode.appendLine("$allocVariable = alloca ${allocVariable.type}, align ${allocVariable.type?.align}")
-        llvmCode.appendLine("store ${allocVariable.type} $sourceVariable, ${allocVariable.type}* $allocVariable, align ${allocVariable.type?.align}")
-        llvmCode.appendLine("$targetVariable = load ${targetVariable.type}, ${targetVariable.type}* tmp, align ${targetVariable.type?.align}")
     }
 
     fun addConstant(allocVariable: LLVMVariable, constantValue: LLVMConstant) {

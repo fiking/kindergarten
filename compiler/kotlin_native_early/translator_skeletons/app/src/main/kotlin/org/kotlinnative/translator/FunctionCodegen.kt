@@ -159,7 +159,8 @@ class FunctionCodegen(val state: TranslationState, val function: KtNamedFunction
     }
 
     private fun evaluateBinaryExpression(expr: KtBinaryExpression, scopeDepth: Int) : LLVMNode {
-//        debugPrintNode(expr)
+        println("\n\n")
+        debugPrintNode(expr)
         val left = evaluateExpression(expr.firstChild, scopeDepth) as LLVMSingleValue? ?: throw UnsupportedOperationException("Wrong binary exception")
         val right = evaluateExpression(expr.lastChild, scopeDepth) as LLVMSingleValue? ?: throw UnsupportedOperationException("Wrong binary exception")
         val operator = expr.operationToken

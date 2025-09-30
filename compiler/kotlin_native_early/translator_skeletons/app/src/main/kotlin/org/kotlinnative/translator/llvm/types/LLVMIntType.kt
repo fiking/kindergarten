@@ -26,4 +26,22 @@ class LLVMIntType() : LLVMType() {
         firstOp: LLVMSingleValue,
         secondOp: LLVMSingleValue
     ): LLVMExpression = LLVMExpression(LLVMIntType(), "sub nsw i32 $firstOp, $secondOp")
+
+    override fun operatorLt(result: LLVMVariable, firstOp: LLVMSingleValue, secondOp: LLVMSingleValue): LLVMExpression =
+        LLVMExpression(LLVMIntType(), "icmp slt i32 $firstOp, $secondOp")
+
+    override fun operatorGt(result: LLVMVariable, firstOp: LLVMSingleValue, secondOp: LLVMSingleValue): LLVMExpression =
+        LLVMExpression(LLVMIntType(), "icmp sgt i32 $firstOp, $secondOp")
+
+    override fun operatorLeq(result: LLVMVariable, firstOp: LLVMSingleValue, secondOp: LLVMSingleValue): LLVMExpression =
+        LLVMExpression(LLVMIntType(), "icmp sle i32 $firstOp, $secondOp")
+
+    override fun operatorGeq(result: LLVMVariable, firstOp: LLVMSingleValue, secondOp: LLVMSingleValue): LLVMExpression =
+        LLVMExpression(LLVMIntType(), "icmp sge i32 $firstOp, $secondOp")
+
+    override fun operatorEq(result: LLVMVariable, firstOp: LLVMSingleValue, secondOp: LLVMSingleValue): LLVMExpression =
+        LLVMExpression(LLVMIntType(), "icmp eq i32 $firstOp, $secondOp")
+
+    override fun operatorNeq(result: LLVMVariable, firstOp: LLVMSingleValue, secondOp: LLVMSingleValue): LLVMExpression =
+        LLVMExpression(LLVMIntType(), "icmp ne i32 $firstOp, $secondOp")
 }
