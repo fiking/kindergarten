@@ -27,9 +27,9 @@ class LLVMBuilder {
         return LLVMVariable("%var$variableCount", type, kotlinName, pointer = pointer)
     }
 
-    fun getNewLabel() : LLVMLabel {
+    fun getNewLabel(scope: LLVMScope = LLVMLocalScope()) : LLVMLabel {
         labelCount++
-        return LLVMLabel("%lablel$labelCount")
+        return LLVMLabel("%lablel$labelCount", scope)
     }
 
     fun addLLVMCode(code : String) {
@@ -163,5 +163,18 @@ class LLVMBuilder {
 
     fun addCondition(condition: LLVMSingleValue, thenLabel: LLVMLabel, elseLabel: LLVMLabel) {
         llvmCode.appendLine("br ${condition.getType()} $condition, label $thenLabel, label $elseLabel")
+    }
+
+    fun markWithLabel(label: LLVMLabel?) {
+        if (label != null)
+            llvmCode.appendLine("${label.label}: ")
+    }
+
+    fun addNopInstruction() {
+        llvmCode.appendLine(getNewVariable(LLVMIntType()).toString() + " = add i1 0, 0    ; nop instruction")
+    }
+
+    fun addUnconditionJump(label: LLVMLabel) {
+        llvmCode.appendLine("br label $label")
     }
 }
