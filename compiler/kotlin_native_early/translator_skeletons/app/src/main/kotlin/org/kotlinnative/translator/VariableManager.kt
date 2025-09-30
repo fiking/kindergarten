@@ -1,11 +1,13 @@
 package org.kotlinnative.translator
 
 import org.kotlinnative.translator.llvm.LLVMVariable
+import org.kotlinnative.translator.llvm.types.LLVMType
 import java.util.Stack
 
 class VariableManager {
     private var fileVariableCollectionTree = HashMap<String, Stack<Pair<LLVMVariable, Int>>>()
     private var globalVariableCollection = HashMap<String, LLVMVariable>()
+    private var variableVersion = HashMap<String, Int>()
 
     fun getLLVMValue(variableName : String) : LLVMVariable? {
         return fileVariableCollectionTree[variableName]?.peek()?.first ?: globalVariableCollection.get(variableName)
@@ -19,5 +21,11 @@ class VariableManager {
         val stack = fileVariableCollectionTree.getOrDefault(name, Stack<Pair<LLVMVariable, Int>>())
         stack.push(Pair(variable, level))
         fileVariableCollectionTree.put(name, stack)
+    }
+
+    fun getVariable(name: String, type: LLVMType, pointer: Boolean) : LLVMVariable {
+        val ourVersion = variableVersion.getOrDefault(name, 0) + 1
+        variableVersion.put(name, ourVersion)
+        return LLVMVariable("%managed.${name}.${ourVersion}", kotlinName = name, type = type, pointer = pointer)
     }
 }

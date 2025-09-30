@@ -222,7 +222,7 @@ class FunctionCodegen(val state: TranslationState, val function: KtNamedFunction
                 return null
             }
             is LLVMConstant -> {
-                val newVar = LLVMVariable("%${identifier.text}.addr", type = LLVMIntType(), kotlinName = identifier.text, pointer = true)
+                val newVar = variableManager.getVariable(identifier.text, type = LLVMIntType(), pointer = true)
                 codeBuilder.addConstant(newVar, assignExpression)
                 variableManager.addVariable(identifier.text, newVar, scopeDepth)
             }
