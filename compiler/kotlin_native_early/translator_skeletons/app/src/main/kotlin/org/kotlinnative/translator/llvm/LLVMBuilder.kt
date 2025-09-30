@@ -13,6 +13,13 @@ class LLVMBuilder {
     private var variableCount = 0
 
     constructor() {}
+    init {
+        initBuilder()
+    }
+    private fun initBuilder() {
+        val memcpy = "declare void @llvm.memcpy.p0i8.p0i8.i64(i8* nocapture, i8* nocapture readonly, i64, i32, i1)"
+        llvmCode.appendLine(memcpy)
+    }
 
     fun addLLVMCode(code : String) {
         llvmCode.appendLine(code)
@@ -22,6 +29,7 @@ class LLVMBuilder {
 
     fun clean() {
         llvmCode = StringBuilder()
+        initBuilder()
     }
 
     fun addAssignment(llvmVariable: LLVMVariable, rhs: LLVMNode) {
@@ -49,7 +57,6 @@ class LLVMBuilder {
             KtTokens.MINUS -> left.type!!.operatorMinus(resultOp, leftNativeOp, rightNativeOp)
             KtTokens.MUL -> left.type!!.operatorTimes(resultOp, leftNativeOp, rightNativeOp)
             KtTokens.EQEQ -> left.type!!.operatorEq(resultOp, leftNativeOp, rightNativeOp)
-
             KtTokens.EQ -> {
                 val result = leftNativeOp as LLVMVariable
                 storeVariable(result, rightNativeOp)
@@ -120,6 +127,10 @@ class LLVMBuilder {
     fun createClass(name: String, fields: List<LLVMVariable>) {
         val code = "@class.$name = type { ${ fields.map { it.type }.joinToString() } }"
         llvmCode.appendLine(code)
+    }
+
+    fun allocaVar(target: LLVMVariable) {
+        llvmCode.appendLine("$target = alloca ${target.type}, align ${target.type?.align!!}")
     }
 
     fun bitcast(dst: LLVMVariable, llvmType: LLVMType) : LLVMVariable {

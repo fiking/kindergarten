@@ -23,6 +23,7 @@ class ClassCodeGen(val state: TranslationState, val clazz: KtClass, val codeBuil
     val native: Boolean
     val fields = ArrayList<LLVMVariable>()
     val name = "%class.${clazz.name}"
+    val constructorName = "@${clazz.name}"
     val type: LLVMType = parseLLVMType(name)
     val size: Int
     init {

@@ -1,5 +1,10 @@
 class MyClass(val a: Int)
 
+fun classConstruct() {
+  val a = 2
+  val clazz = MyClass(a)
+}
+
 fun cmp() {
   val a = 2;
   val b = 3;
