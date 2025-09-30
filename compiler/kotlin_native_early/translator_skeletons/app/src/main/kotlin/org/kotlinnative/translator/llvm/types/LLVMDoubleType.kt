@@ -10,19 +10,16 @@ class LLVMDoubleType() : LLVMType() {
     override val size: Byte = 8
 
     override fun operatorPlus(
-        result: LLVMVariable,
         firstOp: LLVMSingleValue,
         secondOp: LLVMSingleValue
     ): LLVMExpression = LLVMExpression(LLVMDoubleType(), "fadd double $firstOp, $secondOp")
 
     override fun operatorTimes(
-        result: LLVMVariable,
         firstOp: LLVMSingleValue,
         secondOp: LLVMSingleValue
     ): LLVMExpression = LLVMExpression(LLVMDoubleType(), "fmul double i32 $firstOp, $secondOp")
 
     override fun operatorMinus(
-        result: LLVMVariable,
         firstOp: LLVMSingleValue,
         secondOp: LLVMSingleValue
     ): LLVMExpression = LLVMExpression(LLVMDoubleType(), "fsub double i32 $firstOp, $secondOp")

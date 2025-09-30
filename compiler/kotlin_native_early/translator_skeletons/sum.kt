@@ -1,5 +1,13 @@
 class MyClass(val a: Int)
 
+fun ifTest() {
+  val a = 2;
+  val b = 3;
+  if (a > b) {
+    return a
+  }
+}
+
 fun classConstruct() {
   val a = 2
   val clazz = MyClass(a)
