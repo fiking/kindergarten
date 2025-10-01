@@ -4,6 +4,7 @@ import com.intellij.psi.PsiElement
 import com.intellij.psi.PsiWhiteSpace
 import com.intellij.psi.impl.source.tree.LeafPsiElement
 import com.intellij.psi.tree.IElementType
+import org.jetbrains.kotlin.KtNodeTypes
 import org.jetbrains.kotlin.lexer.KtTokens
 import org.jetbrains.kotlin.psi.KtBinaryExpression
 import org.jetbrains.kotlin.psi.KtBlockExpression
@@ -19,6 +20,9 @@ import org.jetbrains.kotlin.resolve.BindingContext
 import org.jetbrains.kotlin.resolve.calls.util.getValueArgumentsInParentheses
 import org.kotlinnative.translator.debug.debugPrintNode
 import org.kotlinnative.translator.llvm.*
+import org.kotlinnative.translator.llvm.types.LLVMBooleanType
+import org.kotlinnative.translator.llvm.types.LLVMCharType
+import org.kotlinnative.translator.llvm.types.LLVMDoubleType
 import org.kotlinnative.translator.llvm.types.LLVMIntType
 import org.kotlinnative.translator.llvm.types.LLVMType
 import org.kotlinnative.translator.llvm.types.LLVMVoidType
@@ -207,7 +211,14 @@ class FunctionCodegen(val state: TranslationState, val function: KtNamedFunction
     }
 
     private fun evaluateConstantExpression(expr: KtConstantExpression) : LLVMConstant {
-        return LLVMConstant(expr.node.firstChildNode.text, LLVMIntType(), pointer = false)
+        val type = when (expr.node.elementType) {
+            KtNodeTypes.BOOLEAN_CONSTANT -> LLVMBooleanType()
+            KtNodeTypes.INTEGER_CONSTANT -> LLVMIntType()
+            KtNodeTypes.FLOAT_CONSTANT -> LLVMDoubleType()
+            KtNodeTypes.CHARACTER_CONSTANT -> LLVMCharType()
+            else -> throw IllegalArgumentException("Unknown type")
+        }
+        return LLVMConstant(expr.node.firstChildNode.text, type, pointer = false)
     }
 
     private fun evaluateLeafPsiElement(element: LeafPsiElement, scopeDepth: Int) : LLVMVariable? {
