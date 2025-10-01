@@ -49,7 +49,7 @@ class FunctionCodegen(val state: TranslationState, val function: KtNamedFunction
         debugPrintNode(function.bodyExpression)
         println("generate is end")
         generateLoadArguments()
-        evaluateCodeBlock(function.bodyExpression, startLabel = null, finishLabel = null, scopeDepth = 0)
+        evaluateCodeBlock(function.bodyExpression)
 
         if (returnType is LLVMVoidType) {
             codeBuilder.addVoidReturn()
@@ -83,7 +83,7 @@ class FunctionCodegen(val state: TranslationState, val function: KtNamedFunction
         return external
     }
 
-    private fun evaluateCodeBlock(expr: PsiElement?, startLabel: LLVMLabel?, finishLabel: LLVMLabel?, scopeDepth: Int) {
+    private fun evaluateCodeBlock(expr: PsiElement?, startLabel: LLVMLabel? = null, finishLabel: LLVMLabel? = null, scopeDepth: Int = 0) {
         codeBuilder.markWithLabel(startLabel)
         expressionWalker(expr, scopeDepth)
         codeBuilder.addUnconditionJump(finishLabel ?: return)
@@ -94,6 +94,10 @@ class FunctionCodegen(val state: TranslationState, val function: KtNamedFunction
             is KtBlockExpression -> expressionWalker(expr.firstChild, scopeDepth + 1)
             is KtProperty -> evaluateLeafPsiElement(expr.firstChild as LeafPsiElement, scopeDepth)
             is KtBinaryExpression -> evaluateBinaryExpression(expr, scopeDepth)
+            is KtCallExpression -> {
+                val expression = evaluateCallExpression(expr) as LLVMCall
+                codeBuilder.addLLVMCode(expression.toString())
+            }
             is PsiElement -> evaluateExpression(expr.firstChild, scopeDepth + 1)
             null -> {
                 variableManager.pullUpwardsLevel(scopeDepth)
