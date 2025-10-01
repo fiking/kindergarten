@@ -26,6 +26,6 @@ class VariableManager {
     fun getVariable(name: String, type: LLVMType, pointer: Boolean) : LLVMVariable {
         val ourVersion = variableVersion.getOrDefault(name, 0) + 1
         variableVersion.put(name, ourVersion)
-        return LLVMVariable("%managed.$name.$ourVersion", kotlinName = name, type = type, pointer = pointer)
+        return LLVMVariable("%managed.$name.$ourVersion", type, name, pointer)
     }
 }
