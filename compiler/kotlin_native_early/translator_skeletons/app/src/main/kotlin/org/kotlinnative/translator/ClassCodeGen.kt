@@ -74,7 +74,7 @@ class ClassCodeGen(val state: TranslationState, val clazz: KtClass, val codeBuil
         argFields.add(thisField)
         argFields.addAll(fields)
 
-        codeBuilder.addLLVMCode(LLVMFunctionDescriptor(clazz.name!!, argFields, LLVMVoidType()))
+        codeBuilder.addLLVMCode(LLVMFunctionDescriptor(clazz.name!!, argFields, LLVMVoidType(), state.arm))
         codeBuilder.addStartExpression()
         generateLoadArguments(thisField)
         generateAssignments()

@@ -34,19 +34,15 @@ import kotlin.script.dependencies.Environment
 
 class TranslationState(
     val environment: KotlinCoreEnvironment,
-    val bindingContext: BindingContext?
+    val bindingContext: BindingContext?,
+    val arm: Boolean
 ) {
     var functions = HashMap<String, FunctionCodegen>()
     var classes = HashMap<String, ClassCodeGen>()
     val variableManager = VariableManager()
 }
 
-//    private val classPath : ArrayList<File> by lazy {
-//        val classpath = arrayListOf<File>()
-//        classpath += PathUtil.getResourcePathForClass(AnnotationTarget.CLASS.javaClass)
-//        classpath
-//    }
-fun parseAndAnalyze(sources: List<String>, disposer: Disposable): TranslationState {
+fun parseAndAnalyze(sources: List<String>, disposer: Disposable, arm: Boolean = false): TranslationState {
     val configuration = CompilerConfiguration()
     val messageCollector = GroupingMessageCollector(object : MessageCollector {
         private var hasError = false
@@ -74,7 +70,7 @@ fun parseAndAnalyze(sources: List<String>, disposer: Disposable): TranslationSta
         EnvironmentConfigFiles.JVM_CONFIG_FILES
     )
     val bindingContext = analyze(environment)?.bindingContext //?: throw TranslationException()
-    return TranslationState(environment, bindingContext)
+    return TranslationState(environment, bindingContext, arm)
 }
 
 fun analyze(environment: KotlinCoreEnvironment): AnalysisResult? {

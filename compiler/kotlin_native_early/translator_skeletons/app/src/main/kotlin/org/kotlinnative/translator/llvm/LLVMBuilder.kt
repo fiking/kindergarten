@@ -8,18 +8,21 @@ import org.kotlinnative.translator.llvm.types.LLVMIntType
 import org.kotlinnative.translator.llvm.types.LLVMType
 import kotlin.reflect.KFunction0
 
-class LLVMBuilder {
+class LLVMBuilder(val arm: Boolean) {
     private var llvmCode : StringBuilder = StringBuilder()
     private var variableCount = 0
     private var labelCount = 0
 
-    constructor() {}
     init {
         initBuilder()
     }
     private fun initBuilder() {
         val memcpy = "declare void @llvm.memcpy.p0i8.p0i8.i64(i8* nocapture, i8* nocapture readonly, i64, i32, i1)"
         llvmCode.appendLine(memcpy)
+        if (arm) {
+            val funcAttributes = """attributes #0 = { nounwind "stack-protector-buffer-size"="8" "target-cpu"="cortex-m3" "target-features"="+hwdiv,+strict-align" }"""
+            llvmCode.appendLine(funcAttributes)
+        }
     }
 
     fun getNewVariable(type: LLVMType?, pointer: Boolean = false, kotlinName: String? = null): LLVMVariable {

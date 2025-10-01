@@ -7,7 +7,7 @@ import org.kotlinnative.translator.llvm.LLVMBuilder
 import org.kotlinnative.translator.utils.FunctionDescriptor
 
 class FileTranslator(val state: TranslationState, val file: KtFile) {
-    private var codeBuilder = LLVMBuilder()
+    private var codeBuilder = LLVMBuilder(state.arm)
     fun generateCode(): String {
         codeBuilder.clean()
         generateFileBody()
