@@ -61,8 +61,8 @@ class FunctionCodegen(val state: TranslationState, val function: KtNamedFunction
     private fun generateLoadArguments() {
         args?.forEach {
             val loadVariable = LLVMVariable("%{it.label}", it.type, it.label, false)
-            codeBuilder.loadArgument(loadVariable)
-            variableManager.addVariable(it.label, loadVariable, 2)
+            val allocVar = codeBuilder.loadArgument(loadVariable)
+            variableManager.addVariable(it.label, allocVar, 2)
         }
     }
 
@@ -212,6 +212,7 @@ class FunctionCodegen(val state: TranslationState, val function: KtNamedFunction
             KtTokens.VAL_KEYWORD -> evaluateValExpression(element, scopeDepth)
             KtTokens.VAR_KEYWORD -> evaluateValExpression(element, scopeDepth)
             KtTokens.IF_KEYWORD -> evaluateIfOperator(element, scopeDepth,false)
+            KtTokens.WHILE_KEYWORD -> evaluateWhileOperator(element, scopeDepth)
             else -> null
         }
     }
@@ -239,7 +240,7 @@ class FunctionCodegen(val state: TranslationState, val function: KtNamedFunction
                 codeBuilder.addLLVMCode(assignExpression.call(result).toString())
             }
             else -> {
-                codeBuilder.addAssignment(LLVMVariable("%${identifier.text}", null, identifier.text), assignExpression)
+                codeBuilder.addAssignment(LLVMVariable("%${identifier.text}", LLVMIntType(), identifier.text), assignExpression)
             }
         }
         return null
@@ -277,10 +278,10 @@ class FunctionCodegen(val state: TranslationState, val function: KtNamedFunction
     }
 
     private fun evaluateIBlock(condition: KtBinaryExpression, thenExpression: PsiElement, elseExpresssion: PsiElement?, scopeDepth: Int) : LLVMVariable? {
-        val conditionResult: LLVMVariable = evaluateBinaryExpression(condition, scopeDepth + 1)
-        val thenLabel = codeBuilder.getNewLabel()
-        val elseLabel = codeBuilder.getNewLabel()
-        val endLabel = codeBuilder.getNewLabel()
+        val conditionResult = evaluateBinaryExpression(condition, scopeDepth + 1)
+        val thenLabel = codeBuilder.getNewLabel(prefix = "if")
+        val elseLabel = codeBuilder.getNewLabel(prefix = "if")
+        val endLabel = codeBuilder.getNewLabel(prefix = "if")
         codeBuilder.addCondition(conditionResult, thenLabel, elseLabel)
 
         evaluateCodeBlock(thenExpression, thenLabel, endLabel, scopeDepth + 1)
@@ -293,9 +294,9 @@ class FunctionCodegen(val state: TranslationState, val function: KtNamedFunction
         val conditionResult: LLVMVariable = evaluateBinaryExpression(condition, scopeDepth + 1)
         val variable = codeBuilder.getNewVariable(LLVMIntType(), true)
         codeBuilder.allocaVar(variable)
-        val thenLabel = codeBuilder.getNewLabel()
-        val elseLabel = codeBuilder.getNewLabel()
-        val endLabel = codeBuilder.getNewLabel()
+        val thenLabel = codeBuilder.getNewLabel(prefix = "if")
+        val elseLabel = codeBuilder.getNewLabel(prefix = "if")
+        val endLabel = codeBuilder.getNewLabel(prefix = "if")
 
         codeBuilder.addCondition(conditionResult, thenLabel, elseLabel)
         codeBuilder.markWithLabel(thenLabel)
@@ -308,5 +309,30 @@ class FunctionCodegen(val state: TranslationState, val function: KtNamedFunction
         codeBuilder.addUnconditionJump(endLabel)
         codeBuilder.markWithLabel(endLabel)
         return variable
+    }
+
+    private fun evaluateWhileOperator(element: LeafPsiElement, scopeDepth: Int): LLVMVariable? {
+        var getBrackets = element.getNextSiblingIgnoringWhitespaceAndComments() ?: return null
+        val condition = getBrackets.getNextSiblingIgnoringWhitespaceAndComments() ?: return null
+        getBrackets = condition.getNextSiblingIgnoringWhitespaceAndComments() ?: return null
+        val bodyExpression = getBrackets.getNextSiblingIgnoringWhitespaceAndComments() ?: return null
+
+        return executeWhileBlock(condition.firstChild as KtBinaryExpression, bodyExpression.firstChild, scopeDepth)
+    }
+
+    private fun executeWhileBlock(condition: KtBinaryExpression, bodyExpression: PsiElement, scopeDepth: Int): LLVMVariable? {
+        val conditionLable = codeBuilder.getNewLabel(prefix = "while")
+        val bodyLable = codeBuilder.getNewLabel(prefix = "while")
+        val exitLable = codeBuilder.getNewLabel(prefix = "while")
+
+        codeBuilder.addUnconditionJump(conditionLable)
+        codeBuilder.markWithLabel(conditionLable)
+        val conditionResult = evaluateBinaryExpression(condition, scopeDepth + 1)
+
+        codeBuilder.addCondition(conditionResult, bodyLable, exitLable)
+        evaluateCodeBlock(bodyExpression, bodyLable, conditionLable, scopeDepth + 1)
+        codeBuilder.markWithLabel(exitLable)
+
+        return null
     }
 }
