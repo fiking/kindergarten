@@ -27,7 +27,7 @@ class LLVMBuilder(val arm: Boolean) {
 
     fun getNewVariable(type: LLVMType?, pointer: Boolean = false, kotlinName: String? = null): LLVMVariable {
         variableCount++
-        return LLVMVariable("%var$variableCount", type, kotlinName, pointer = pointer)
+        return LLVMVariable("%var$variableCount", type, kotlinName, pointer)
     }
 
     fun getNewLabel(scope: LLVMScope = LLVMLocalScope()) : LLVMLabel {
@@ -99,7 +99,7 @@ class LLVMBuilder(val arm: Boolean) {
 
     fun loadAndGetVariable(source: LLVMVariable) : LLVMVariable {
         assert(!source.pointer)
-        val target = getNewVariable(type = source.type, pointer = source.pointer, kotlinName = source.kotlinName)
+        val target = getNewVariable(source.type,source.pointer, source.kotlinName)
         val code = "$target = load ${target.type}, ${source.type} $source, align ${target.type?.align!!}"
         llvmCode.appendLine(code)
         return target
