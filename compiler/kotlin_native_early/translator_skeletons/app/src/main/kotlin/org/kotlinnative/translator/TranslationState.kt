@@ -38,8 +38,9 @@ class TranslationState(
     val arm: Boolean
 ) {
     var functions = HashMap<String, FunctionCodegen>()
-    var classes = HashMap<String, ClassCodeGen>()
     val variableManager = VariableManager()
+    var classes = HashMap<String, ClassCodeGen>()
+    var properties = HashMap<String, PropertyCodegen>()
 }
 
 fun parseAndAnalyze(sources: List<String>, disposer: Disposable, arm: Boolean = false): TranslationState {

@@ -9,6 +9,7 @@ class LLVMCharType() : LLVMType() {
 
     override val align = 1
     override val size: Byte = 1
+    override val defaultValue = "0"
 
     override fun operatorLt(firstOp: LLVMSingleValue, secondOp: LLVMSingleValue): LLVMExpression =
         LLVMExpression(LLVMIntType(), "icmp slt i8 $firstOp, $secondOp")

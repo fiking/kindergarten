@@ -1,5 +1,6 @@
 package org.kotlinnative.translator
 
+import org.kotlinnative.translator.llvm.LLVMLocalScope
 import org.kotlinnative.translator.llvm.LLVMVariable
 import org.kotlinnative.translator.llvm.types.LLVMType
 import java.util.Stack
@@ -23,9 +24,14 @@ class VariableManager {
         fileVariableCollectionTree.put(name, stack)
     }
 
-    fun getVariable(name: String, type: LLVMType, pointer: Boolean) : LLVMVariable {
+    fun addGlobalVariable(name: String, variable: LLVMVariable) {
+        globalVariableCollection.put(name, variable)
+    }
+
+    fun receiveVariable(name: String, type: LLVMType, pointer: Boolean): LLVMVariable {
         val ourVersion = variableVersion.getOrDefault(name, 0) + 1
         variableVersion.put(name, ourVersion)
-        return LLVMVariable("%managed.$name.$ourVersion", type, name, pointer)
+
+        return LLVMVariable("%managed.$name.$ourVersion", type, name, LLVMLocalScope(), pointer)
     }
 }

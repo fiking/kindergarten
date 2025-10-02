@@ -8,6 +8,7 @@ class LLVMDoubleType() : LLVMType() {
     override fun toString(): String = "double"
     override val align: Int = 8
     override val size: Byte = 8
+    override val defaultValue = "0.0"
 
     override fun operatorPlus(
         firstOp: LLVMSingleValue,
