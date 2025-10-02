@@ -14,10 +14,12 @@ import org.jetbrains.kotlin.psi.KtIfExpression
 import org.jetbrains.kotlin.psi.KtNamedFunction
 import org.jetbrains.kotlin.psi.KtProperty
 import org.jetbrains.kotlin.psi.KtReferenceExpression
+import org.jetbrains.kotlin.psi.KtStringTemplateExpression
 import org.jetbrains.kotlin.psi.KtValueArgument
 import org.jetbrains.kotlin.psi.psiUtil.getNextSiblingIgnoringWhitespaceAndComments
 import org.jetbrains.kotlin.resolve.BindingContext
 import org.jetbrains.kotlin.resolve.calls.util.getValueArgumentsInParentheses
+import org.jetbrains.kotlin.resolve.constants.TypedCompileTimeConstant
 import org.kotlinnative.translator.debug.debugPrintNode
 import org.kotlinnative.translator.llvm.*
 import org.kotlinnative.translator.llvm.types.LLVMBooleanType
@@ -25,6 +27,7 @@ import org.kotlinnative.translator.llvm.types.LLVMCharType
 import org.kotlinnative.translator.llvm.types.LLVMDoubleType
 import org.kotlinnative.translator.llvm.types.LLVMIntType
 import org.kotlinnative.translator.llvm.types.LLVMReferenceType
+import org.kotlinnative.translator.llvm.types.LLVMStringType
 import org.kotlinnative.translator.llvm.types.LLVMType
 import org.kotlinnative.translator.llvm.types.LLVMVoidType
 import java.util.ArrayList
@@ -132,6 +135,7 @@ class FunctionCodegen(val state: TranslationState, val function: KtNamedFunction
             is KtIfExpression -> evaluateIfOperator(expr.firstChild as LeafPsiElement, scopeDepth + 1, true)
             is KtDotQualifiedExpression -> evaluateDotExpression(expr, scopeDepth)
             is PsiWhiteSpace -> null
+            is KtStringTemplateExpression -> evaluateStringTemplateExpression(expr, scopeDepth + 1)
             is PsiElement -> evaluatePsiElement(expr, scopeDepth)
             null -> null
             else -> throw UnsupportedOperationException()
@@ -236,18 +240,18 @@ class FunctionCodegen(val state: TranslationState, val function: KtNamedFunction
         val assignExpression = evaluateExpression(eq.getNextSiblingIgnoringWhitespaceAndComments(), scopeDepth) ?: return null
         when (assignExpression) {
             is LLVMVariable -> {
-                val allocVar = variableManager.receiveVariable(identifier.text, LLVMIntType(), pointer = true)
+                val allocVar = variableManager.receiveVariable(identifier.text, LLVMIntType(), LLVMLocalScope(), pointer = true)
                 codeBuilder.allocaVar(allocVar)
                 variableManager.addVariable(identifier.text, allocVar, scopeDepth)
-                codeBuilder.copyVariableValue(assignExpression, allocVar)
+                copyVariable(assignExpression, allocVar)
             }
             is LLVMConstant -> {
-                val newVar = variableManager.receiveVariable(identifier.text, LLVMIntType(), pointer = true)
+                val newVar = variableManager.receiveVariable(identifier.text, LLVMIntType(), LLVMLocalScope(), pointer = true)
                 codeBuilder.addConstant(newVar, assignExpression)
                 variableManager.addVariable(identifier.text, newVar, scopeDepth)
             }
             is LLVMConstructorCall -> {
-                val result = variableManager.receiveVariable(identifier!!.text, assignExpression.type, pointer = false)
+                val result = variableManager.receiveVariable(identifier!!.text, assignExpression.type, LLVMLocalScope(), pointer = false)
                 codeBuilder.allocaVar(result)
                 result.pointer = true
                 codeBuilder.addLLVMCode(assignExpression.call(result).toString())
@@ -362,5 +366,20 @@ class FunctionCodegen(val state: TranslationState, val function: KtNamedFunction
         val result = codeBuilder.getNewVariable(field.type, pointer = true)
         codeBuilder.loadClassField(result, receiver, field.offset)
         return result
+    }
+
+    fun evaluateStringTemplateExpression(expr: KtStringTemplateExpression, scope: Int): LLVMSingleValue? {
+        val receiveValue = state.bindingContext?.get(BindingContext.COMPILE_TIME_VALUE, expr)
+        val type = (receiveValue as TypedCompileTimeConstant).type
+        val value = receiveValue.getValue(type) ?: return null
+        val variable = variableManager.receiveVariable(".str",
+            LLVMStringType(value.toString().length), LLVMGlobalScope(), pointer = false)
+        codeBuilder.addStringConstant(variable, value.toString())
+        return variable
+    }
+
+    private fun copyVariable(from: LLVMVariable, to: LLVMVariable) = when (from.type) {
+        is LLVMStringType -> codeBuilder.storeString(to, from, 0)
+        else -> codeBuilder.copyVariableValue(to, from)
     }
 }
