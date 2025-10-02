@@ -12,16 +12,11 @@ import org.kotlinnative.translator.llvm.LLVMVariable
 class PropertyCodegen(val state: TranslationState, val property: KtProperty, val codeBuilder: LLVMBuilder) {
     private val variableManager = state.variableManager
 
-    companion object PropertyState {
-
-    }
-
     fun generate() {
         val varInfo = state.bindingContext?.get(BindingContext.VARIABLE, property)?.compileTimeInitializer ?: return
 
         val kotlinType: KotlinType? = null//varInfo.getType()
         val value = varInfo.value
-        //[TODO] compile time initizializer
         if (kotlinType != null && kotlinType.nameIfStandardType != null) {
             val variableType = LLVMMapStandardType(property.name ?: return, kotlinType).type
             val variable = LLVMVariable(

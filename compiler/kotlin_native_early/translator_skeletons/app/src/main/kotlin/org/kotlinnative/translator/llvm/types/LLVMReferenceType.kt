@@ -7,7 +7,7 @@ class LLVMReferenceType(val type: String, val prefix: String = "") : LLVMType() 
     override fun toString(): String = "$prefix.$type"
     override val align: Int = 4
     override val size: Byte = 4
-    override val defaultValue = throw UnsupportedOperationException()
+    override val defaultValue = ""
 
     private val params = ArrayList<String>()
 
