@@ -3,13 +3,13 @@ package org.kotlinnative.translator
 import com.intellij.psi.PsiElement
 import com.intellij.psi.PsiWhiteSpace
 import com.intellij.psi.impl.source.tree.LeafPsiElement
-import com.intellij.psi.tree.IElementType
 import org.jetbrains.kotlin.KtNodeTypes
 import org.jetbrains.kotlin.lexer.KtTokens
 import org.jetbrains.kotlin.psi.KtBinaryExpression
 import org.jetbrains.kotlin.psi.KtBlockExpression
 import org.jetbrains.kotlin.psi.KtCallExpression
 import org.jetbrains.kotlin.psi.KtConstantExpression
+import org.jetbrains.kotlin.psi.KtDotQualifiedExpression
 import org.jetbrains.kotlin.psi.KtIfExpression
 import org.jetbrains.kotlin.psi.KtNamedFunction
 import org.jetbrains.kotlin.psi.KtProperty
@@ -24,12 +24,11 @@ import org.kotlinnative.translator.llvm.types.LLVMBooleanType
 import org.kotlinnative.translator.llvm.types.LLVMCharType
 import org.kotlinnative.translator.llvm.types.LLVMDoubleType
 import org.kotlinnative.translator.llvm.types.LLVMIntType
+import org.kotlinnative.translator.llvm.types.LLVMReferenceType
 import org.kotlinnative.translator.llvm.types.LLVMType
 import org.kotlinnative.translator.llvm.types.LLVMVoidType
-import org.kotlinnative.translator.llvm.types.parseLLVMType
-import org.kotlinnative.translator.utils.FunctionArgument
 import java.util.ArrayList
-import kotlin.math.exp
+
 
 class FunctionCodegen(val state: TranslationState, val function: KtNamedFunction, val codeBuilder: LLVMBuilder) {
     var name = function.fqName.toString()
@@ -130,6 +129,7 @@ class FunctionCodegen(val state: TranslationState, val function: KtNamedFunction
             is KtCallExpression -> evaluateCallExpression(expr)
             is KtReferenceExpression -> evaluateReferenceExpression(expr)
             is KtIfExpression -> evaluateIfOperator(expr.firstChild as LeafPsiElement, scopeDepth + 1, true)
+            is KtDotQualifiedExpression -> evaluateDotExpression(expr, scopeDepth)
             is PsiWhiteSpace -> null
             is PsiElement -> evaluatePsiElement(expr, scopeDepth)
             null -> null
@@ -249,10 +249,11 @@ class FunctionCodegen(val state: TranslationState, val function: KtNamedFunction
                 variableManager.addVariable(identifier.text, newVar, scopeDepth)
             }
             is LLVMConstructorCall -> {
-                val result = LLVMVariable("%${identifier.text}", assignExpression.type)
+                val result = variableManager.getVariable(identifier!!.text, assignExpression.type, pointer = false)
                 codeBuilder.allocaVar(result)
                 result.pointer = true
                 codeBuilder.addLLVMCode(assignExpression.call(result).toString())
+                variableManager.addVariable(identifier.text, result, scopeDepth)
             }
             else -> {
                 codeBuilder.addAssignment(LLVMVariable("%${identifier.text}", LLVMIntType(), identifier.text), assignExpression)
@@ -349,5 +350,19 @@ class FunctionCodegen(val state: TranslationState, val function: KtNamedFunction
         codeBuilder.markWithLabel(exitLable)
 
         return null
+    }
+
+    private fun evaluateDotExpression(expr: KtDotQualifiedExpression, scopeDepth: Int) : LLVMVariable? {
+        val receiverName = expr.receiverExpression.text
+        val selectorName = expr.selectorExpression!!.text
+
+        val receiver = variableManager.getLLVMValue(receiverName)!!
+
+        val clazz = state.classes[(receiver.type as LLVMReferenceType).type]!!
+        val field = clazz.fieldsIndex[selectorName]!!
+
+        val result = codeBuilder.getNewVariable(field.type, pointer = true)
+        codeBuilder.loadClassField(result, receiver, field.offset)
+        return result
     }
 }

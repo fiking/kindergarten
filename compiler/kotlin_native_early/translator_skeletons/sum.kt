@@ -1,5 +1,10 @@
 class MyClass(val a: Int)
 
+fun readClassField() : Int {
+  var value = MyClass()
+  return value.a
+}
+
 fun ifTest() {
   val a = 2;
   val b = 3;
