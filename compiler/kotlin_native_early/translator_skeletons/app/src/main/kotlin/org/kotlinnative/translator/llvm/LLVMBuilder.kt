@@ -160,9 +160,9 @@ class LLVMBuilder(val arm: Boolean) {
         llvmLocalCode.appendLine("$target = alloca ${target.type}, align ${target.type.align}")
     }
 
-    fun bitcast(dst: LLVMVariable, llvmType: LLVMType) : LLVMVariable {
+    fun bitcast(src: LLVMVariable, llvmType: LLVMType) : LLVMVariable {
         val empty = getNewVariable(llvmType, true)
-        val code = "$empty = bitcast ${dst.getType()} $dst to $llvmType"
+        val code = "$empty = bitcast ${src.getType()} $src to $llvmType"
         llvmLocalCode.appendLine(code)
         return empty
     }
