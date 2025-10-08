@@ -5,6 +5,7 @@ import com.intellij.psi.PsiWhiteSpace
 import com.intellij.psi.impl.source.tree.LeafPsiElement
 import org.jetbrains.kotlin.KtNodeTypes
 import org.jetbrains.kotlin.lexer.KtTokens
+import org.jetbrains.kotlin.psi.KtArrayAccessExpression
 import org.jetbrains.kotlin.psi.KtBinaryExpression
 import org.jetbrains.kotlin.psi.KtBlockExpression
 import org.jetbrains.kotlin.psi.KtCallExpression
@@ -23,6 +24,7 @@ import org.jetbrains.kotlin.resolve.calls.util.getValueArgumentsInParentheses
 import org.jetbrains.kotlin.resolve.constants.TypedCompileTimeConstant
 import org.kotlinnative.translator.debug.debugPrintNode
 import org.kotlinnative.translator.llvm.*
+import org.kotlinnative.translator.llvm.types.LLVMArray
 import org.kotlinnative.translator.llvm.types.LLVMBooleanType
 import org.kotlinnative.translator.llvm.types.LLVMCharType
 import org.kotlinnative.translator.llvm.types.LLVMDoubleType
@@ -159,11 +161,11 @@ class FunctionCodegen(val state: TranslationState, val function: KtNamedFunction
             is KtConstantExpression -> evaluateConstantExpression(expr)
             is KtCallExpression -> evaluateCallExpression(expr, scopeDepth)
             is KtCallableReferenceExpression -> evaluateCallableReferenceExpression(expr)
-            is KtReferenceExpression -> evaluateReferenceExpression(expr)
+            is KtReferenceExpression -> evaluateReferenceExpression(expr, scopeDepth)
             is KtIfExpression -> evaluateIfOperator(expr.firstChild as LeafPsiElement, scopeDepth + 1, true)
             is KtDotQualifiedExpression -> evaluateDotExpression(expr)
-            is PsiWhiteSpace -> null
             is KtStringTemplateExpression -> evaluateStringTemplateExpression(expr, scopeDepth + 1)
+            is PsiWhiteSpace -> null
             is PsiElement -> evaluatePsiElement(expr, scopeDepth)
             null -> null
             else -> throw UnsupportedOperationException()
@@ -175,9 +177,19 @@ class FunctionCodegen(val state: TranslationState, val function: KtNamedFunction
         return LLVMMapStandardType(expr.text.substring(2), kotlinType)
     }
 
-    private fun evaluateReferenceExpression(expr: KtReferenceExpression): LLVMSingleValue? {
-        val variableName = expr.firstChild.text
-        return variableManager.getLLVMValue(variableName)
+    fun evaluateArrayAccessExpression(expr: KtArrayAccessExpression, scope: Int): LLVMSingleValue? {
+        val arrayNameVariable = evaluateReferenceExpression(expr.arrayExpression as KtReferenceExpression, scope) as LLVMVariable
+        val arrayIndex = evaluateConstantExpression(expr.indexExpressions.first() as KtConstantExpression)
+        val arrayReceivedVariable = codeBuilder.loadAndGetVariable(arrayNameVariable)
+        val arrayElementType = (arrayNameVariable.type as LLVMArray).basicType()
+        val indexVariable = codeBuilder.getNewVariable(arrayElementType, pointer = true)
+        codeBuilder.loadVariableOffset(indexVariable, arrayReceivedVariable, arrayIndex);
+        return indexVariable
+    }
+
+    private fun evaluateReferenceExpression(expr: KtReferenceExpression, scopeDepth: Int): LLVMSingleValue? = when (expr) {
+        is KtArrayAccessExpression -> evaluateArrayAccessExpression(expr, scopeDepth + 1)
+        else -> variableManager.getLLVMValue(expr.firstChild.text)
     }
 
     private fun evaluateCallExpression(expr: KtCallExpression, scopeDepth: Int): LLVMSingleValue? {
@@ -282,8 +294,8 @@ class FunctionCodegen(val state: TranslationState, val function: KtNamedFunction
         val result = ArrayList<LLVMSingleValue>()
 
         for (arg in args) {
-            val expr = evaluateExpression(arg.getArgumentExpression(), scopeDepth) as LLVMSingleValue
-            result.add(expr)
+            val currentExpression = evaluateExpression(arg.getArgumentExpression(), scopeDepth) as LLVMSingleValue
+            result.add(currentExpression)
         }
         return result
     }

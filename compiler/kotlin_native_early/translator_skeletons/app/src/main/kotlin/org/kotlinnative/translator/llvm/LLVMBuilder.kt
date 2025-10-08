@@ -204,4 +204,9 @@ class LLVMBuilder(val arm: Boolean) {
                 "${stringType.fullType()}* $source, i32 0, i32 $offset), ${target.getType()} $target, align ${stringType.align}"
         llvmLocalCode.appendLine(code)
     }
+
+    fun loadVariableOffset(target: LLVMVariable, source: LLVMVariable, index: LLVMConstant) {
+        val code = "$target = getelementptr inbounds ${target.type}, ${source.type} $source, ${index.type} ${index.value}"
+        llvmLocalCode.appendLine(code)
+    }
 }
