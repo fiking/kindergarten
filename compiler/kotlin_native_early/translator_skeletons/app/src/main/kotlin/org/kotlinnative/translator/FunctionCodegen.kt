@@ -174,7 +174,7 @@ class FunctionCodegen(val state: TranslationState, val function: KtNamedFunction
 
     private fun evaluateCallableReferenceExpression(expr: KtCallableReferenceExpression): LLVMSingleValue? {
         val kotlinType = state.bindingContext?.get(BindingContext.EXPRESSION_TYPE_INFO, expr)!!.type!!
-        return LLVMMapStandardType(expr.text.substring(2), kotlinType)
+        return LLVMMapStandardType(expr.text.substring(2), kotlinType, LLVMGlobalScope())
     }
 
     fun evaluateArrayAccessExpression(expr: KtArrayAccessExpression, scope: Int): LLVMSingleValue? {
