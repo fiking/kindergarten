@@ -24,7 +24,7 @@ class LLVMBuilder(val arm: Boolean) {
         }
     }
 
-    fun getNewVariable(type: LLVMType, pointer: Boolean = false, kotlinName: String? = null): LLVMVariable {
+    fun getNewVariable(type: LLVMType, pointer: Int = 0, kotlinName: String? = null): LLVMVariable {
         variableCount++
         return LLVMVariable("%var$variableCount", type, kotlinName, LLVMLocalScope(), pointer)
     }
@@ -89,15 +89,12 @@ class LLVMBuilder(val arm: Boolean) {
 
     fun receiveNativeValue(firstOp: LLVMSingleValue) : LLVMSingleValue = when (firstOp) {
         is LLVMConstant -> firstOp
-        is LLVMVariable -> when (firstOp.pointer) {
-            false -> firstOp
-            else -> loadAndGetVariable(firstOp)
-        }
+        is LLVMVariable -> if (firstOp.pointer == 0) firstOp else loadAndGetVariable(firstOp)
         else -> throw UnsupportedOperationException()
     }
 
     fun loadAndGetVariable(source: LLVMVariable) : LLVMVariable {
-        assert(!source.pointer)
+        assert(source.pointer > 0)
         val target = getNewVariable(source.type,source.pointer, source.kotlinName)
         val code = "$target = load ${target.type}, ${source.getType()} $source, align ${target.type.align}"
         llvmLocalCode.appendLine(code)
@@ -114,13 +111,13 @@ class LLVMBuilder(val arm: Boolean) {
 
     fun copyVariableValue(from: LLVMVariable, to: LLVMVariable) {
         val tmp = getNewVariable(from.type, from.pointer)
-        llvmLocalCode.appendln("$tmp = load ${tmp.type}, ${from.getType()} $from, align ${tmp.type.align}")
-        llvmLocalCode.appendln("store ${to.type} $tmp, ${to.getType()} $to, align ${tmp.type.align}")
+        llvmLocalCode.appendLine("$tmp = load ${tmp.type}, ${from.getType()} $from, align ${tmp.type.align}")
+        llvmLocalCode.appendLine("store ${to.type} $tmp, ${to.getType()} $to, align ${tmp.type.align}")
 
     }
 
     fun loadArgument(llvmVariable: LLVMVariable, store: Boolean = true) : LLVMVariable {
-        val allocVar = LLVMVariable("${llvmVariable.label}.addr", llvmVariable.type, llvmVariable.kotlinName, LLVMLocalScope(), true)
+        val allocVar = LLVMVariable("${llvmVariable.label}.addr", llvmVariable.type, llvmVariable.kotlinName, LLVMLocalScope(), 1)
         addVariableByRef(allocVar, llvmVariable, store)
         return allocVar
     }
@@ -161,7 +158,7 @@ class LLVMBuilder(val arm: Boolean) {
     }
 
     fun bitcast(src: LLVMVariable, llvmType: LLVMType) : LLVMVariable {
-        val empty = getNewVariable(llvmType, true)
+        val empty = getNewVariable(llvmType, 1)
         val code = "$empty = bitcast ${src.getType()} $src to $llvmType"
         llvmLocalCode.appendLine(code)
         return empty
@@ -185,7 +182,7 @@ class LLVMBuilder(val arm: Boolean) {
         llvmLocalCode.appendLine(getNewVariable(LLVMIntType()).toString() + " = add i1 0, 0    ; nop instruction")
     }
 
-    fun addUnconditionJump(label: LLVMLabel) {
+    fun addUnconditionalJump(label: LLVMLabel) {
         llvmLocalCode.appendLine("br label $label")
     }
 

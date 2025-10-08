@@ -24,7 +24,7 @@ class PropertyCodegen(val state: TranslationState, val property: KtProperty, val
                 variableType,
                 property.name.toString(),
                 LLVMLocalScope(),
-                pointer = true
+                pointer = 1
             )
             variableManager.addGlobalVariable(property.name.toString(), variable)
             codeBuilder.declareGlobalVariable(variable, variableType.parseArg(value.toString()))

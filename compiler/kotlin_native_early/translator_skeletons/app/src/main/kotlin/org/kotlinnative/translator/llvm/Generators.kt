@@ -1,6 +1,5 @@
 package org.kotlinnative.translator.llvm
 
-import org.jetbrains.kotlin.builtins.isFunctionType
 import org.jetbrains.kotlin.builtins.isFunctionTypeOrSubtype
 import org.jetbrains.kotlin.types.KotlinType
 import org.jetbrains.kotlin.types.typeUtil.isUnit
@@ -26,12 +25,12 @@ fun LLVMMapStandardType(name: String, type: KotlinType?, scope: LLVMScope = LLVM
             LLVMFunctionType(type),
             type.toString(),
             scope,
-            pointer = true
+            pointer = 1
         )
 
         type.toString() == "Int" -> LLVMVariable(name, LLVMIntType(), type.toString(), scope)
         type.toString() == "Double" -> LLVMVariable(name, LLVMDoubleType(), type.toString(), scope)
         type.isUnit() -> LLVMVariable("", LLVMVoidType(), "", scope)
-        else -> LLVMVariable(name, LLVMReferenceType("$type"), name, scope, pointer = true)
+        else -> LLVMVariable(name, LLVMReferenceType("$type"), name, scope, pointer = 1)
     }
 }
