@@ -13,7 +13,7 @@ import org.kotlinnative.translator.llvm.types.LLVMReferenceType
 import org.kotlinnative.translator.llvm.types.LLVMType
 
 class ClassCodegen(override val state: TranslationState, override val variableManager: VariableManager, val clazz: KtClass, override val codeBuilder: LLVMBuilder) :
-    StructCodegen(state, variableManager, state.bindingContext?.get(BindingContext.CLASS, clazz) ?: throw TranslationException(), codeBuilder) {
+    StructCodegen(state, variableManager, clazz, state.bindingContext?.get(BindingContext.CLASS, clazz) ?: throw TranslationException(), codeBuilder) {
     val annotation: Boolean
 
     override val size: Int
