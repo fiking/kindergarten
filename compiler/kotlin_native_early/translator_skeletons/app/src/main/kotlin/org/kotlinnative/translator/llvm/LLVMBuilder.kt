@@ -5,6 +5,7 @@ import org.jetbrains.kotlin.lexer.KtTokens
 import org.jetbrains.kotlin.psi.KtSimpleNameExpression
 import org.kotlinnative.translator.llvm.types.LLVMByteType
 import org.kotlinnative.translator.llvm.types.LLVMIntType
+import org.kotlinnative.translator.llvm.types.LLVMNullType
 import org.kotlinnative.translator.llvm.types.LLVMStringType
 import org.kotlinnative.translator.llvm.types.LLVMType
 
@@ -82,6 +83,19 @@ class LLVMBuilder(val arm: Boolean) {
             KtTokens.EQEQ -> firstOp.type!!.operatorEq(firstNativeOp, secondNativeOp)
             KtTokens.EXCLEQ -> firstOp.type!!.operatorNeq(firstNativeOp, secondNativeOp)
             KtTokens.EQ -> {
+                if (secondOp.type is LLVMNullType) {
+                    val result = getNewVariable(firstOp.type!!, firstOp.pointer)
+                    allocStackVar(result)
+                    result.pointer++
+
+                    storeNull(result)
+                    return result
+                }
+
+                if (firstOp.pointer > 0 && secondOp.pointer > 0) {
+                    return secondOp as LLVMVariable
+                }
+
                 val result = firstNativeOp as LLVMVariable
                 storeVariable(result, secondNativeOp)
                 return result
