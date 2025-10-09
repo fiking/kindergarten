@@ -27,7 +27,8 @@ class ObjectCodegen(override val state: TranslationState, override val variableM
             "object.instance.$structName",
             type,
             objectDeclaration.name,
-            LLVMVariableScope()
+            LLVMVariableScope(),
+            pointer=1
         )
         codeBuilder.addGlobalIntialize(classInstance, type)
         variableManager.addGlobalVariable(structName, classInstance)
