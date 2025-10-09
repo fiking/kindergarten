@@ -18,7 +18,6 @@ import org.kotlinnative.translator.llvm.LLVMRegisterScope
 import org.kotlinnative.translator.llvm.LLVMVariable
 import org.kotlinnative.translator.llvm.types.LLVMByteType
 import org.kotlinnative.translator.llvm.types.LLVMReferenceType
-import org.kotlinnative.translator.llvm.types.LLVMType
 import org.kotlinnative.translator.llvm.types.LLVMVoidType
 
 abstract class StructCodegen(open val state: TranslationState,
