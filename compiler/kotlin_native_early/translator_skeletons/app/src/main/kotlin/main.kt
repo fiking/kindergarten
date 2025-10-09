@@ -9,7 +9,7 @@ fun main(args: Array<String>) {
     }
 
     val disposer = Disposer.newDisposable()
-    val state = parseAndAnalyze(args.asList(), disposer, false)
+    val state = parseAndAnalyze(args.asList(), disposer, true)
     val files = state.environment.getSourceFiles()
     if (files.isEmpty()) {
         println("Empty")
