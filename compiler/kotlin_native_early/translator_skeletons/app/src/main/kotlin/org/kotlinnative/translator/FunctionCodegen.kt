@@ -213,24 +213,27 @@ class FunctionCodegen(val state: TranslationState, val variableManager: Variable
 
         if (state.functions.containsKey(function)) {
             val descriptor = state.functions[function] ?: return null
-            return evaluateFunctionCallExpression(LLVMVariable(function, descriptor.returnType.type, scope = LLVMVariableScope()), names, descriptor.args)
+            val args = loadArgsIfRequired(names, descriptor.args)
+            return evaluateFunctionCallExpression(LLVMVariable(function, descriptor.returnType.type, scope = LLVMVariableScope()), args)
         }
 
         if (state.classes.containsKey(function)) {
             val descriptor = state.classes[function] ?: return null
-            return evaluateConstructorCallExpression(LLVMVariable(function, descriptor.type, scope = LLVMVariableScope()), names)
+            val args = loadArgsIfRequired(names, descriptor.fields)
+            return evaluateConstructorCallExpression(LLVMVariable(function, descriptor.type, scope = LLVMVariableScope()), args)
         }
 
         val localFunction = variableManager.getLLVMValue(function)
         if (localFunction != null) {
             val type = localFunction.type as LLVMFunctionType
-            return evaluateFunctionCallExpression(LLVMVariable(function, type.returnType.type, scope = LLVMRegisterScope()), names, type.arguments)
+            val args = loadArgsIfRequired(names, type.arguments)
+            return evaluateFunctionCallExpression(LLVMVariable(function, type.returnType.type, scope = LLVMRegisterScope()), args)
         }
 
         return null
     }
 
-    private fun evaluateConstructorCallExpression(function: LLVMVariable, names: ArrayList<LLVMSingleValue>): LLVMSingleValue? {
+    private fun evaluateConstructorCallExpression(function: LLVMVariable, names: List<LLVMSingleValue>): LLVMSingleValue? {
         val result = codeBuilder.getNewVariable(function.type, pointer = 1)
         codeBuilder.allocStaticVar(result)
         result.pointer = 1
@@ -248,18 +251,7 @@ class FunctionCodegen(val state: TranslationState, val variableManager: Variable
         return result
     }
 
-    private fun evaluateFunctionCallExpression(function: LLVMVariable, names: List<LLVMSingleValue>, args: List<LLVMVariable>): LLVMSingleValue? {
-        val names = names.mapIndexed(fun(i: Int, value: LLVMSingleValue): LLVMSingleValue {
-            var result = value
-
-            if (result.pointer > 0 && args[i].pointer == 0) {
-                result = codeBuilder.getNewVariable(args[i].type)
-                codeBuilder.loadVariable(result, value as LLVMVariable)
-            }
-
-            return result
-        }).toList()
-
+    private fun evaluateFunctionCallExpression(function: LLVMVariable, names: List<LLVMSingleValue>): LLVMSingleValue? {
         val returnType = function.type
         when (returnType) {
             is LLVMVoidType -> {
@@ -292,6 +284,17 @@ class FunctionCodegen(val state: TranslationState, val variableManager: Variable
 
         return null
     }
+
+    private fun loadArgsIfRequired(names: List<LLVMSingleValue>, args: List<LLVMVariable>) = names.mapIndexed(fun(i: Int, value: LLVMSingleValue): LLVMSingleValue {
+        var result = value
+
+        if (result.pointer > 0 && args[i].pointer == 0) {
+            result = codeBuilder.getNewVariable(args[i].type)
+            codeBuilder.loadVariable(result, value as LLVMVariable)
+        }
+
+        return result
+    }).toList()
 
     private fun parseArgList(expr: KtCallExpression, scopeDepth: Int): ArrayList<LLVMSingleValue> {
         val args = expr.getValueArgumentsInParentheses()
@@ -507,7 +510,7 @@ class FunctionCodegen(val state: TranslationState, val variableManager: Variable
 
             val names = parseArgList(expr.lastChild as KtCallExpression, scopeDepth)
             methodArgs.addAll(names)
-            return evaluateFunctionCallExpression(LLVMVariable(methodName, returnType, scope = LLVMRegisterScope()), methodArgs, method.args)
+            return evaluateFunctionCallExpression(LLVMVariable(methodName, returnType, scope = LLVMRegisterScope()), loadArgsIfRequired(methodArgs, method.args))
         }
     }
 

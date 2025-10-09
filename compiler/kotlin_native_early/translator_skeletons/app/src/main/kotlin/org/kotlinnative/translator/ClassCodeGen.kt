@@ -44,7 +44,8 @@ class ClassCodeGen(val state: TranslationState, val variableManager: VariableMan
                 offset++
             }
         }
-        when (descriptor.kind) {
+
+        when (descriptor?.kind) {
             ClassKind.ENUM_CLASS -> {
                 val item = LLVMClassVariable("enum_item", LLVMEnumItemType())
                 item.offset = offset
@@ -53,6 +54,7 @@ class ClassCodeGen(val state: TranslationState, val variableManager: VariableMan
                 currentSize += type.size
                 offset++
             }
+            else -> null
         }
 
         size = currentSize
