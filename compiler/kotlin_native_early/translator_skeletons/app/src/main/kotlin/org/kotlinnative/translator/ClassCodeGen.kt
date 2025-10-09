@@ -11,17 +11,17 @@ import org.jetbrains.kotlin.resolve.annotations.argumentValue
 import org.kotlinnative.translator.llvm.LLVMBuilder
 import org.kotlinnative.translator.llvm.LLVMClassVariable
 import org.kotlinnative.translator.llvm.LLVMFunctionDescriptor
+import org.kotlinnative.translator.llvm.LLVMMapStandardType
 import org.kotlinnative.translator.llvm.LLVMRegisterScope
 import org.kotlinnative.translator.llvm.LLVMVariable
 import org.kotlinnative.translator.llvm.types.LLVMCharType
 import org.kotlinnative.translator.llvm.types.LLVMReferenceType
 import org.kotlinnative.translator.llvm.types.LLVMType
 import org.kotlinnative.translator.llvm.types.LLVMVoidType
-import org.kotlinnative.translator.llvm.types.parseLLVMType
 
 class ClassCodeGen(val state: TranslationState, val variableManager: VariableManager, val clazz: KtClass, val codeBuilder: LLVMBuilder) {
     val annotation: Boolean
-    val native: Boolean
+    val plain: Boolean = false // TODO
     val fields = ArrayList<LLVMVariable>()
     val fieldsIndex = HashMap<String, LLVMClassVariable>()
     val type: LLVMType = LLVMReferenceType(clazz.name.toString(), "class", byRef = true)
@@ -37,8 +37,7 @@ class ClassCodeGen(val state: TranslationState, val variableManager: VariableMan
         annotation = descriptor?.kind == ClassKind.ANNOTATION_CLASS
         if (!annotation) {
             for (field in parameterList) {
-                val type = getNativeType(field) ?: parseLLVMType((field.typeReference?.typeElement as KtUserType).referencedName!!)
-                val item = LLVMClassVariable(field.name!!, type, offset)
+                val item = resolveType(field)
                 fields.add(item)
                 fieldsIndex[item.label] = item
                 currentSize += type.size
@@ -46,7 +45,6 @@ class ClassCodeGen(val state: TranslationState, val variableManager: VariableMan
             }
         }
 
-        native = isNative(descriptor?.annotations)
         size = currentSize
     }
     fun generate() {
@@ -63,7 +61,7 @@ class ClassCodeGen(val state: TranslationState, val variableManager: VariableMan
             }
         }
         val classVal = LLVMVariable("classvariable.this", type, pointer = 1)
-        variableManager.addVariable("this", classVal, 0);
+        variableManager.addVariable("this", classVal, 0)
         for (function in methods.values) {
 
             function.generate(classVal)
@@ -128,19 +126,39 @@ class ClassCodeGen(val state: TranslationState, val variableManager: VariableMan
     private fun generateReturn() {
         val dst = LLVMVariable("%classvariable.this", type, "", scope = LLVMRegisterScope(),1)
         val src = LLVMVariable("%classvariable.this.addr", type, "", scope = LLVMRegisterScope(),1)
-        val castedDst = codeBuilder.bitcast(dst, LLVMCharType())
-        val castedSrc = codeBuilder.bitcast(src, LLVMCharType())
+        val castedDst = codeBuilder.bitcast(dst, LLVMVariable("", LLVMCharType(), pointer = 1))
+        val castedSrc = codeBuilder.bitcast(src, LLVMVariable("", LLVMCharType(), pointer = 1))
         codeBuilder.memcpy(castedDst, castedSrc, size)
     }
 
-    private fun getNativeType(field: KtParameter) : LLVMType? {
-        for (annotation in field.annotationEntries) {
-            val annotationDescriptor = state.bindingContext?.get(BindingContext.ANNOTATION, annotation)
-            val type = annotationDescriptor?.type.toString()
-            if (type == "Native") {
-                return parseLLVMType(annotationDescriptor!!.argumentValue("type").toString())
-            }
+    private fun resolveType(field: KtParameter) : LLVMClassVariable {
+        val annotations = parseFieldAnnotations(field)
+
+        var ktType = state.bindingContext?.get(BindingContext.TYPE, field.typeReference)
+        val result = LLVMMapStandardType(field.name!!, ktType, LLVMRegisterScope())
+
+        if (result.type is LLVMReferenceType) {
+            (result.type as LLVMReferenceType).prefix = "class"
         }
-        return null
+
+        if (annotations.contains("Plain")) {
+            result.pointer = 0
+        }
+
+        return LLVMClassVariable(result.label, result.type, result.pointer)
+    }
+
+    private fun parseFieldAnnotations(field: KtParameter): Set<String> {
+        val result = HashSet<String>()
+
+        for (annotation in field.annotationEntries) {
+            val annotationDescriptor =
+                state.bindingContext?.get(BindingContext.ANNOTATION, annotation)
+            val type = annotationDescriptor?.type.toString()
+
+            result.add(type)
+        }
+
+        return result
     }
 }

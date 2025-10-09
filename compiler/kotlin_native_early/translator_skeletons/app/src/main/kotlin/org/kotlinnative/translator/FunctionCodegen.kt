@@ -218,7 +218,7 @@ class FunctionCodegen(val state: TranslationState, val variableManager: Variable
 
         if (state.classes.containsKey(function)) {
             val descriptor = state.classes[function] ?: return null
-            return evaluateConstructorCallExpression(function, names, descriptor.type)
+            return evaluateConstructorCallExpression(LLVMVariable(function, descriptor.type, scope = LLVMVariableScope()), names)
         }
 
         val localFunction = variableManager.getLLVMValue(function)
@@ -230,9 +230,9 @@ class FunctionCodegen(val state: TranslationState, val variableManager: Variable
         return null
     }
 
-    private fun evaluateConstructorCallExpression(name: String, names: ArrayList<LLVMSingleValue>, retType: LLVMType): LLVMSingleValue? {
-        val result = codeBuilder.getNewVariable(retType)
-        codeBuilder.allocaVar(result)
+    private fun evaluateConstructorCallExpression(function: LLVMVariable, names: ArrayList<LLVMSingleValue>): LLVMSingleValue? {
+        val result = codeBuilder.getNewVariable(function.type, pointer = 1)
+        codeBuilder.allocStaticVar(result)
         result.pointer = 1
 
         val args = ArrayList<LLVMSingleValue>()
@@ -241,7 +241,7 @@ class FunctionCodegen(val state: TranslationState, val variableManager: Variable
 
         codeBuilder.addLLVMCode(LLVMCall(
             LLVMVoidType(),
-            name,
+            function.toString(),
             args
         ).toString())
 
@@ -266,8 +266,8 @@ class FunctionCodegen(val state: TranslationState, val variableManager: Variable
                 codeBuilder.addLLVMCode(LLVMCall(LLVMVoidType(), function.toString(), names).toString())
             }
             is LLVMReferenceType -> {
-                val result = codeBuilder.getNewVariable(returnType)
-                codeBuilder.allocaVar(result)
+                val result = codeBuilder.getNewVariable(returnType, pointer = 1)
+                codeBuilder.allocStaticVar(result)
                 result.pointer = 1
 
                 val args = ArrayList<LLVMSingleValue>()
@@ -283,7 +283,7 @@ class FunctionCodegen(val state: TranslationState, val variableManager: Variable
                 codeBuilder.addAssignment(result, LLVMCall(returnType, function.toString(), names))
 
                 val resultPtr = codeBuilder.getNewVariable(returnType)
-                codeBuilder.allocaVar(resultPtr)
+                codeBuilder.allocStackVar(resultPtr)
                 resultPtr.pointer = 1
                 codeBuilder.storeVariable(resultPtr, result)
                 return resultPtr
@@ -362,7 +362,7 @@ class FunctionCodegen(val state: TranslationState, val variableManager: Variable
             is LLVMVariable -> {
                 val allocVar = variableManager.receiveVariable(identifier.text, assignExpression.type,
                     LLVMRegisterScope(), pointer = 1)
-                codeBuilder.allocaVar(allocVar)
+                codeBuilder.allocStackVar(allocVar)
                 variableManager.addVariable(identifier.text, allocVar, scopeDepth)
                 copyVariable(assignExpression, allocVar)
             }
@@ -383,8 +383,8 @@ class FunctionCodegen(val state: TranslationState, val variableManager: Variable
         val retVar = evaluateExpression(next, scopeDepth) as LLVMSingleValue
         when (returnType.type) {
             is LLVMReferenceType -> {
-                val src = codeBuilder.bitcast(retVar as LLVMVariable, LLVMCharType())
-                val dst = codeBuilder.bitcast(returnType, LLVMCharType())
+                val src = codeBuilder.bitcast(retVar as LLVMVariable, LLVMVariable("", LLVMCharType(), pointer = 1))
+                val dst = codeBuilder.bitcast(returnType, LLVMVariable("", LLVMCharType(), pointer = 1))
                 val size = state.classes[(retVar.type as LLVMReferenceType).type]!!.size
                 codeBuilder.memcpy(dst, src, size)
                 codeBuilder.addAnyReturn(LLVMVoidType())
@@ -440,7 +440,7 @@ class FunctionCodegen(val state: TranslationState, val variableManager: Variable
     private fun executeIfExpression(condition: KtBinaryExpression, thenExpression: PsiElement, elseExpression: PsiElement?, scopeDepth: Int): LLVMVariable? {
         val conditionResult: LLVMVariable = evaluateBinaryExpression(condition, scopeDepth + 1)
         val variable = codeBuilder.getNewVariable(LLVMIntType(), 1)
-        codeBuilder.allocaVar(variable)
+        codeBuilder.allocStackVar(variable)
         val thenLabel = codeBuilder.getNewLabel(prefix = "if")
         val elseLabel = codeBuilder.getNewLabel(prefix = "if")
         val endLabel = codeBuilder.getNewLabel(prefix = "if")
@@ -526,9 +526,5 @@ class FunctionCodegen(val state: TranslationState, val variableManager: Variable
     private fun copyVariable(from: LLVMVariable, to: LLVMVariable) = when (from.type) {
         is LLVMStringType -> codeBuilder.storeString(to, from, 0)
         else -> codeBuilder.copyVariableValue(to, from)
-    }
-
-    private fun evaluateTypeReferenceAssignment(type: KtUserType, expr: KtConstantExpression) {
-
     }
 }

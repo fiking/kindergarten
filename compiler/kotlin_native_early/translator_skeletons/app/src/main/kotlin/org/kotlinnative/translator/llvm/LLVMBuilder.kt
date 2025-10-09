@@ -2,13 +2,15 @@ package org.kotlinnative.translator.llvm
 
 import com.intellij.psi.tree.IElementType
 import org.jetbrains.kotlin.lexer.KtTokens
+import org.kotlinnative.translator.llvm.types.LLVMCharType
 import org.kotlinnative.translator.llvm.types.LLVMIntType
 import org.kotlinnative.translator.llvm.types.LLVMStringType
 import org.kotlinnative.translator.llvm.types.LLVMType
 
 class LLVMBuilder(val arm: Boolean) {
-    private var llvmLocalCode : StringBuilder = StringBuilder()
-    private var llvmGlobalCode: StringBuilder = StringBuilder()
+    private val POINTER_SIZE = 4
+    private var localCode : StringBuilder = StringBuilder()
+    private var globalCode: StringBuilder = StringBuilder()
     private var variableCount = 0
     private var labelCount = 0
 
@@ -16,11 +18,13 @@ class LLVMBuilder(val arm: Boolean) {
         initBuilder()
     }
     private fun initBuilder() {
-        val memcpy = "declare void @llvm.memcpy.p0i8.p0i8.i64(i8* nocapture, i8* nocapture readonly, i64, i32, i1)"
-        llvmLocalCode.appendLine(memcpy)
+        val declares = arrayOf(
+            "declare void @llvm.memcpy.p0i8.p0i8.i64(i8* nocapture, i8* nocapture readonly, i64, i32, i1)",
+            "declare i8* @malloc_static(i32)")
+        declares.forEach { globalCode.appendLine(it) }
         if (arm) {
             val funcAttributes = """attributes #0 = { nounwind "stack-protector-buffer-size"="8" "target-cpu"="cortex-m3" "target-features"="+hwdiv,+strict-align" }"""
-            llvmLocalCode.appendLine(funcAttributes)
+            globalCode.appendLine(funcAttributes)
         }
     }
 
@@ -35,26 +39,26 @@ class LLVMBuilder(val arm: Boolean) {
     }
 
     fun addLLVMCode(code : String) {
-        llvmLocalCode.appendLine(code)
+        localCode.appendLine(code)
     }
 
-    override fun toString(): String = llvmGlobalCode.toString() + llvmLocalCode.toString()
+    override fun toString(): String = globalCode.toString() + localCode.toString()
 
     fun clean() {
-        llvmLocalCode = StringBuilder()
+        localCode = StringBuilder()
         initBuilder()
     }
 
     fun addAssignment(llvmVariable: LLVMVariable, rhs: LLVMNode) {
-        llvmLocalCode.appendLine("$llvmVariable = $rhs")
+        localCode.appendLine("$llvmVariable = $rhs")
     }
 
     fun addStartExpression() {
-        llvmLocalCode.appendLine("{")
+        localCode.appendLine("{")
     }
 
     fun addEndExpression() {
-        llvmLocalCode.appendLine("}")
+        localCode.appendLine("}")
     }
 
     fun addPrimitiveBinaryOperation(
@@ -97,25 +101,25 @@ class LLVMBuilder(val arm: Boolean) {
         assert(source.pointer > 0)
         val target = getNewVariable(source.type, source.pointer, source.kotlinName)
         val code = "$target = load ${source.getType()} $source, align ${target.type.align}"
-        llvmLocalCode.appendln(code)
+        localCode.appendln(code)
         return target
     }
 
     fun addReturnOperator(llvmVariable: LLVMSingleValue) {
-        llvmLocalCode.appendLine("ret ${llvmVariable.type} $llvmVariable")
+        localCode.appendLine("ret ${llvmVariable.type} $llvmVariable")
     }
 
     fun addAnyReturn(type: LLVMType, value: String = type.defaultValue) {
-        llvmLocalCode.appendLine("ret $type $value")
+        localCode.appendLine("ret $type $value")
     }
 
     fun copyVariableValue(target: LLVMVariable, source: LLVMVariable) {
         var from = source
         if (source.pointer > 0) {
             from = getNewVariable(source.type, source.pointer)
-            llvmLocalCode.appendLine("$from = load ${source.getType()} $source, align ${from.type.align}")
+            localCode.appendLine("$from = load ${source.getType()} $source, align ${from.type.align}")
         }
-        llvmLocalCode.appendLine("store ${target.type} $from, ${target.getType()} $target, align ${from.type.align}")
+        localCode.appendLine("store ${target.type} $from, ${target.getType()} $target, align ${from.type.align}")
     }
 
     fun loadArgument(llvmVariable: LLVMVariable, store: Boolean = true) : LLVMVariable {
@@ -126,87 +130,96 @@ class LLVMBuilder(val arm: Boolean) {
 
     fun loadVariable(target: LLVMVariable, source: LLVMVariable) {
         val code = "$target = load ${source.getType()} $source, align ${target.type.align}"
-        llvmLocalCode.appendln(code)
+        localCode.appendln(code)
     }
 
     fun loadClassField(target: LLVMVariable, source: LLVMVariable, offset: Int) {
         val code = "$target = getelementptr inbounds ${source.type}* $source, i32, 0, i32 $offset"
-        llvmLocalCode.appendLine(code)
+        localCode.appendLine(code)
     }
 
     fun storeVariable(target: LLVMVariable, source: LLVMSingleValue) {
         val code = "store ${source.type} $source, ${target.getType()} $target, align ${source.type?.align!!}"
-        llvmLocalCode.appendLine(code)
+        localCode.appendLine(code)
     }
 
     fun addVariableByRef(targetVariable: LLVMVariable, sourceVariable: LLVMVariable, store: Boolean) {
-        llvmLocalCode.appendLine("$targetVariable = alloca ${sourceVariable.type}${"*".repeat(sourceVariable.pointer)}, align ${sourceVariable.type.align}")
+        localCode.appendLine("$targetVariable = alloca ${sourceVariable.type}${"*".repeat(sourceVariable.pointer)}, align ${sourceVariable.type.align}")
         if (store) {
-            llvmLocalCode.appendLine("store ${sourceVariable.getType()} $sourceVariable, ${targetVariable.getType()}* $targetVariable, align ${targetVariable.type.align}")
+            localCode.appendLine("store ${sourceVariable.getType()} $sourceVariable, ${targetVariable.getType()}* $targetVariable, align ${targetVariable.type.align}")
         }
     }
 
     fun addConstant(allocVariable: LLVMVariable, constantValue: LLVMConstant) {
-        llvmLocalCode.appendln("$allocVariable = alloca ${allocVariable.type}, align ${allocVariable.type.align}")
-        llvmLocalCode.appendln("store ${allocVariable.type} $constantValue, ${allocVariable.getType()} $allocVariable, align ${allocVariable.type.align}")
+        localCode.appendLine("$allocVariable = alloca ${allocVariable.type}, align ${allocVariable.type.align}")
+        localCode.appendLine("store ${allocVariable.type} $constantValue, ${allocVariable.getType()} $allocVariable, align ${allocVariable.type.align}")
     }
 
     fun createClass(name: String, fields: List<LLVMVariable>) {
         val code = "@class.$name = type { ${ fields.map { it.type }.joinToString() } }"
-        llvmLocalCode.appendLine(code)
+        localCode.appendLine(code)
     }
 
-    fun allocaVar(target: LLVMVariable) {
-        llvmLocalCode.appendLine("$target = alloca ${target.type}, align ${target.type.align}")
+    fun allocStackVar(target: LLVMVariable) {
+        localCode.appendLine("$target = alloca ${target.type}, align ${target.type.align}")
     }
 
-    fun bitcast(src: LLVMVariable, llvmType: LLVMType) : LLVMVariable {
-        val empty = getNewVariable(llvmType, 1)
-        val code = "$empty = bitcast ${src.getType()} $src to $llvmType"
-        llvmLocalCode.appendLine(code)
+    fun allocStaticVar(target: LLVMVariable) {
+        val allocedVar = getNewVariable(LLVMCharType(), pointer = 1)
+        val size = if (target.pointer > 0) POINTER_SIZE else target.type.size
+        val alloc = "$allocedVar = call i8* @malloc_static(i32 $size)"
+        localCode.appendLine(alloc)
+        val cast = "$target = bitcast ${allocedVar.getType()} $allocedVar to ${target.getType()}"
+        localCode.appendLine(cast)
+    }
+
+    fun bitcast(src: LLVMVariable, llvmType: LLVMVariable) : LLVMVariable {
+        val empty = getNewVariable(llvmType.type, llvmType.pointer)
+        val code = "$empty = bitcast ${src.getType()} $src to ${llvmType.getType()}"
+        localCode.appendLine(code)
         return empty
     }
 
     fun memcpy(castedDst: LLVMVariable, castedSrc: LLVMVariable, size: Int, align: Int = 4, volatile: Boolean = false) {
         val code = "call void @llvm.memcpy.p0i8.p0i8.i64(i8* $castedDst, i8* $castedSrc, i64 $size, i32 $align, i1 $volatile)"
-        llvmLocalCode.appendLine(code)
+        localCode.appendLine(code)
     }
 
     fun addCondition(condition: LLVMSingleValue, thenLabel: LLVMLabel, elseLabel: LLVMLabel) {
-        llvmLocalCode.appendLine("br ${condition.getType()} $condition, label $thenLabel, label $elseLabel")
+        localCode.appendLine("br ${condition.getType()} $condition, label $thenLabel, label $elseLabel")
     }
 
     fun markWithLabel(label: LLVMLabel?) {
         if (label != null)
-            llvmLocalCode.appendLine("${label.label}: ")
+            localCode.appendLine("${label.label}: ")
     }
 
     fun addNopInstruction() {
-        llvmLocalCode.appendLine(getNewVariable(LLVMIntType()).toString() + " = add i1 0, 0    ; nop instruction")
+        localCode.appendLine(getNewVariable(LLVMIntType()).toString() + " = add i1 0, 0    ; nop instruction")
     }
 
     fun addUnconditionalJump(label: LLVMLabel) {
-        llvmLocalCode.appendLine("br label $label")
+        localCode.appendLine("br label $label")
     }
 
     fun declareGlobalVariable(variable: LLVMVariable, defaultValue: String = variable.type.defaultValue) {
-        llvmLocalCode.appendLine("$variable = global ${variable.type} $defaultValue, align ${variable.type.align}")
+        localCode.appendLine("$variable = global ${variable.type} $defaultValue, align ${variable.type.align}")
     }
 
     fun addStringConstant(variable: LLVMVariable, value: String) {
         val type = variable.type as LLVMStringType
-        llvmGlobalCode.appendLine("$variable = private unnamed_addr constant  ${type.fullType()} c\"$value\\00\", align 1")
+        globalCode.appendLine("$variable = private unnamed_addr constant  ${type.fullType()} c\"$value\\00\", align 1")
     }
 
     fun storeString(target: LLVMVariable, source: LLVMVariable, offset: Int) {
         val stringType = source.type as LLVMStringType
         val code = "store ${target.type} getelementptr inbounds (${stringType.fullType()}, " +
                 "${stringType.fullType()}* $source, i32 0, i32 $offset), ${target.getType()} $target, align ${stringType.align}"
-        llvmLocalCode.appendLine(code)
+        localCode.appendLine(code)
     }
 
     fun loadVariableOffset(target: LLVMVariable, source: LLVMVariable, index: LLVMConstant) {
         val code = "$target = getelementptr inbounds ${source.type} $source, ${index.type} ${index.value}"
-        llvmLocalCode.appendLine(code)
+        localCode.appendLine(code)
     }
 }
