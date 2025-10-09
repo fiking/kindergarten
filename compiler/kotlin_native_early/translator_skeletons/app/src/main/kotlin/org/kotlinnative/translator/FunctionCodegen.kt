@@ -507,28 +507,28 @@ class FunctionCodegen(val state: TranslationState, val variableManager: Variable
         return null
     }
 
-    private fun evaluateDotExpression(expr: KtDotQualifiedExpression, scopeDepth: Int) : LLVMSingleValue? {
+    private fun evaluateDotExpression(expr: KtDotQualifiedExpression, scopeDepth: Int): LLVMSingleValue? {
         val receiverName = expr.receiverExpression.text
         val selectorName = expr.selectorExpression!!.text
 
         val receiver = variableManager.getLLVMValue(receiverName)!!
 
-        val clazz = state.classes[(receiver.type as LLVMReferenceType).type]!!
+        val clazz = state.classes[(receiver.type as LLVMReferenceType).type] ?: state.objects[(receiver.type as LLVMReferenceType).type]!!
         val field = clazz.fieldsIndex[selectorName]
-
         if (field != null) {
             val result = codeBuilder.getNewVariable(field.type, pointer = 1)
             codeBuilder.loadClassField(result, receiver, field.offset)
             return result
         } else {
-            val methodName = clazz.clazz.name.toString() + '.' + selectorName.substringBefore('(')
+            val methodName = clazz.structName + '.' + selectorName.substringBefore('(')
             val method = clazz.methods[methodName]!!
             val returnType = clazz.methods[methodName]!!.returnType.type
             val methodArgs = mutableListOf<LLVMSingleValue>(receiver)
 
             val names = parseArgList(expr.lastChild as KtCallExpression, scopeDepth)
             methodArgs.addAll(names)
-            return evaluateFunctionCallExpression(LLVMVariable(methodName, returnType, scope = LLVMRegisterScope()), loadArgsIfRequired(methodArgs, method.args))
+
+            return evaluateFunctionCallExpression(LLVMVariable(methodName, returnType, scope = LLVMVariableScope()), loadArgsIfRequired(methodArgs, method.args))
         }
     }
 

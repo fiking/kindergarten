@@ -241,4 +241,9 @@ class LLVMBuilder(val arm: Boolean) {
     fun copyVariableRef(to: LLVMVariable, from: LLVMVariable) {
         var i = 1
     }
+
+    fun addGlobalIntialize(target: LLVMVariable, classType: LLVMType) {
+        val code = "$target = internal global $classType zeroinitializer, align ${classType.align}"
+        globalCode.appendln(code)
+    }
 }
