@@ -56,10 +56,6 @@ class FunctionCodegen(override val state: TranslationState, override val variabl
 
     private fun generateDeclaration(this_type: LLVMVariable? = null): Boolean {
         var external = false
-
-        if (this_type != null) {
-            args.addFirst(this_type)
-        }
         args.forEach {
             val type = it.type
             if (type is LLVMReferenceType && state.classes.containsKey(type.type)) {
@@ -83,6 +79,9 @@ class FunctionCodegen(override val state: TranslationState, override val variabl
         if (returnType!!.pointer > 0) {
             actualReturnType = LLVMVoidType()
             actualArgs.add(returnType!!)
+        }
+        if (this_type != null) {
+            args.addFirst(this_type)
         }
 
         actualArgs.addAll(args)
