@@ -1,5 +1,6 @@
 package org.kotlinnative.translator
 
+import org.jetbrains.kotlin.descriptors.ClassDescriptor
 import org.jetbrains.kotlin.descriptors.ClassKind
 import org.jetbrains.kotlin.descriptors.annotations.Annotations
 import org.jetbrains.kotlin.psi.KtClass
@@ -20,7 +21,6 @@ import org.kotlinnative.translator.llvm.types.LLVMVoidType
 
 class ClassCodeGen(val state: TranslationState, val variableManager: VariableManager, val clazz: KtClass, val codeBuilder: LLVMBuilder) {
     val annotation: Boolean
-    val plain: Boolean = false // TODO
     val fields = ArrayList<LLVMVariable>()
     val fieldsIndex = HashMap<String, LLVMClassVariable>()
     val type: LLVMType = LLVMReferenceType(clazz.name.toString(), "class", byRef = true)
@@ -30,20 +30,25 @@ class ClassCodeGen(val state: TranslationState, val variableManager: VariableMan
     init {
         val descriptor = state.bindingContext?.get(BindingContext.CLASS, clazz) //?: throw TranslationException()
         val parameterList = clazz.getPrimaryConstructorParameterList()?.parameters ?: listOf()
+        annotation = descriptor?.kind == ClassKind.ANNOTATION_CLASS
+        size = indexFields(descriptor, parameterList)
+    }
 
+    private fun indexFields(descriptor: ClassDescriptor?, parameters: List<KtParameter>): Int {
+        if (annotation) {
+            return 0
+        }
         var offset = 0
         var currentSize = 0
-        annotation = descriptor?.kind == ClassKind.ANNOTATION_CLASS
-        if (!annotation) {
-            for (field in parameterList) {
-                val item = resolveType(field)
-                item.offset = offset
-                fields.add(item)
-                fieldsIndex[item.label] = item
-                currentSize += type.size
-                offset++
-            }
+        for (field in parameters) {
+            val item = resolveType(field)
+            item.offset = offset
+            fields.add(item)
+            fieldsIndex[item.label] = item
+            currentSize += type.size
+            offset++
         }
+
 
         when (descriptor?.kind) {
             ClassKind.ENUM_CLASS -> {
@@ -57,7 +62,7 @@ class ClassCodeGen(val state: TranslationState, val variableManager: VariableMan
             else -> null
         }
 
-        size = currentSize
+        return currentSize
     }
     fun generate() {
         if (annotation) return

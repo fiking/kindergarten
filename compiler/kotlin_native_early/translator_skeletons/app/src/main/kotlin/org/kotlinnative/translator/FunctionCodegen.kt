@@ -156,7 +156,7 @@ class FunctionCodegen(val state: TranslationState, val variableManager: Variable
     private fun expressionWalker(expr : PsiElement?, scopeDepth: Int = 0) {
         when(expr) {
             is KtBlockExpression -> expressionWalker(expr.firstChild, scopeDepth + 1)
-            is KtProperty -> evaluateLeafPsiElement(expr.firstChild as LeafPsiElement, scopeDepth)
+            is KtProperty -> evaluateValExpression(expr, scopeDepth)
             is KtBinaryExpression -> evaluateBinaryExpression(expr, scopeDepth)
             is KtCallExpression -> evaluateCallExpression(expr, scopeDepth)
             is KtDoWhileExpression -> evaluateDoWhileExpression(expr.firstChild, scopeDepth + 1)
@@ -330,9 +330,12 @@ class FunctionCodegen(val state: TranslationState, val variableManager: Variable
         val operator = element.getNextSiblingIgnoringWhitespaceAndComments()
         val value = operator?.getNextSiblingIgnoringWhitespaceAndComments() as KtConstantExpression
 
-        return when (operator) {
-            else -> throw UnsupportedOperationException()
+        when (type) {
+            is KtUserType -> {
+                val i = 1
+            }
         }
+        return null
     }
 
     private fun evaluateConstantExpression(expr: KtConstantExpression) : LLVMConstant {
@@ -349,34 +352,41 @@ class FunctionCodegen(val state: TranslationState, val variableManager: Variable
     private fun evaluateLeafPsiElement(element: LeafPsiElement, scopeDepth: Int) : LLVMVariable? {
         return when (element.elementType) {
             KtTokens.RETURN_KEYWORD -> evaluateReturnInstruction(element, scopeDepth)
-            KtTokens.VAL_KEYWORD -> evaluateValExpression(element, scopeDepth)
-            KtTokens.VAR_KEYWORD -> evaluateValExpression(element, scopeDepth)
             KtTokens.IF_KEYWORD -> evaluateIfOperator(element, scopeDepth,false)
             KtTokens.WHILE_KEYWORD -> evaluateWhileOperator(element, scopeDepth)
             else -> null
         }
     }
 
-    private fun evaluateValExpression(element: LeafPsiElement, scopeDepth: Int): LLVMVariable? {
-        val identifier = element.getNextSiblingIgnoringWhitespaceAndComments()
-        val eq = identifier?.getNextSiblingIgnoringWhitespaceAndComments() ?: return null
+    private fun evaluateValExpression(element: KtProperty, scopeDepth: Int): LLVMVariable? {
+//        val variable = state.bindingContext?.get(BindingContext.VARIABLE, element)
+//        val identifier = variable?.name.toString()
+//
+//        val assignExpression = evaluateExpression(element.delegateExpressionOrInitializer, scopeDepth) ?: return null
+        val identifierNode = element.getNextSiblingIgnoringWhitespaceAndComments()
+        val eq = identifierNode?.getNextSiblingIgnoringWhitespaceAndComments() ?: return null
+        val identifier = identifierNode!!.text
+
         val assignExpression = evaluateExpression(eq.getNextSiblingIgnoringWhitespaceAndComments(), scopeDepth) ?: return null
+
+
         when (assignExpression) {
             is LLVMVariable -> {
                 if (assignExpression.pointer == 0) {
-                    val allocVar = variableManager.receiveVariable(identifier!!.text, assignExpression.type, LLVMRegisterScope(), pointer = 0)
+                    val allocVar = variableManager.receiveVariable(identifier, assignExpression.type, LLVMRegisterScope(), pointer = 0)
                     codeBuilder.allocStackVar(allocVar)
                     allocVar.pointer++
-                    variableManager.addVariable(identifier.text, allocVar, scopeDepth)
+                    variableManager.addVariable(identifier, allocVar, scopeDepth)
                     copyVariable(assignExpression, allocVar)
                 } else {
-                    variableManager.addVariable(identifier!!.text, assignExpression, scopeDepth)
+                    variableManager.addVariable(identifier, assignExpression, scopeDepth)
                 }
             }
             is LLVMConstant -> {
-                val newVar = variableManager.receiveVariable(identifier.text, assignExpression.type!!, LLVMRegisterScope(), pointer = 1)
+                val newVar = variableManager.receiveVariable(identifier, assignExpression.type!!, LLVMRegisterScope(), pointer = 1)
+
                 codeBuilder.addConstant(newVar, assignExpression)
-                variableManager.addVariable(identifier.text, newVar, scopeDepth)
+                variableManager.addVariable(identifier, newVar, scopeDepth)
             }
             else -> {
                 throw UnsupportedOperationException()
