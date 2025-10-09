@@ -109,6 +109,10 @@ class LLVMBuilder(val arm: Boolean) {
         llvmLocalCode.appendLine("ret void")
     }
 
+    fun addAnyReturn(type: LLVMType, value: String = type.defaultValue) {
+        llvmLocalCode.appendLine("ret $type $value")
+    }
+
     fun copyVariableValue(from: LLVMVariable, to: LLVMVariable) {
         val tmp = getNewVariable(from.type, from.pointer)
         llvmLocalCode.appendLine("$tmp = load ${tmp.type}, ${from.getType()} $from, align ${tmp.type.align}")

@@ -32,6 +32,7 @@ dependencies {
 
     implementation("org.jetbrains.kotlin:kotlin-compiler:1.9.0")
     implementation("org.jetbrains.kotlin:kotlin-stdlib:1.9.0")
+    implementation("org.jetbrains.kotlin:kotlin-runtime:1.0.2")
 }
 
 // Apply a specific Java toolchain to ease working on different environments.

@@ -70,7 +70,7 @@ fun parseAndAnalyze(sources: List<String>, disposer: Disposable, arm: Boolean = 
         disposer, configuration,
         EnvironmentConfigFiles.JVM_CONFIG_FILES
     )
-    val bindingContext = analyze(environment)?.bindingContext //?: throw TranslationException()
+    val bindingContext = analyze(environment)?.bindingContext // ?: throw TranslationException()
     return TranslationState(environment, bindingContext, arm)
 }
 

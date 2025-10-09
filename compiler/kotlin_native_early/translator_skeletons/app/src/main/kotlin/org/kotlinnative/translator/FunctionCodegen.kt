@@ -41,6 +41,8 @@ class FunctionCodegen(val state: TranslationState, val function: KtNamedFunction
     var returnType: LLVMVariable
     var args = ArrayList<LLVMVariable>()
     val variableManager = state.variableManager
+    val topLevel = 2
+    var wasReturnOnTopLevel = false
 
     init {
         val descriptor = state.bindingContext?.get(BindingContext.FUNCTION,function)
@@ -78,10 +80,10 @@ class FunctionCodegen(val state: TranslationState, val function: KtNamedFunction
         debugPrintNode(function.bodyExpression)
         println("generate is end")
         generateLoadArguments()
-        evaluateCodeBlock(function.bodyExpression)
+        evaluateCodeBlock(function.bodyExpression, scopeDepth = topLevel)
 
-        if (returnType.type is LLVMVoidType) {
-            codeBuilder.addVoidReturn()
+        if (!wasReturnOnTopLevel) {
+            codeBuilder.addAnyReturn(returnType.type)
         }
 
         codeBuilder.addEndExpression()
@@ -90,16 +92,16 @@ class FunctionCodegen(val state: TranslationState, val function: KtNamedFunction
     private fun generateLoadArguments() {
         args.forEach (fun(it: LLVMVariable){
             if (it.type is LLVMFunctionType) {
-                variableManager.addVariable(it.label, LLVMVariable(it.label, it.type, it.label, LLVMLocalScope(), pointer = 1), 2)
+                variableManager.addVariable(it.label, LLVMVariable(it.label, it.type, it.label, LLVMLocalScope(), pointer = 1), topLevel)
                 return
             }
 
             if (it.type !is LLVMReferenceType || (it.type as LLVMReferenceType).isReturn) {
                 val loadVariable = LLVMVariable("${it.label}", it.type, it.label, LLVMLocalScope(), pointer = 0)
                 val allocVar = codeBuilder.loadArgument(loadVariable)
-                variableManager.addVariable(it.label, allocVar, 2)
+                variableManager.addVariable(it.label, allocVar, topLevel)
             } else {
-                variableManager.addVariable(it.label, LLVMVariable(it.label, it.type, it.label, LLVMLocalScope(), pointer = 0), 2)
+                variableManager.addVariable(it.label, LLVMVariable(it.label, it.type, it.label, LLVMLocalScope(), pointer = 0), topLevel)
             }
         })
     }
@@ -370,6 +372,10 @@ class FunctionCodegen(val state: TranslationState, val function: KtNamedFunction
                 val retNativeValue = codeBuilder.receiveNativeValue(retVar)
                 codeBuilder.addReturnOperator(retNativeValue)
             }
+        }
+
+        if (scopeDepth == topLevel + 2) {
+            wasReturnOnTopLevel = true
         }
         return null
     }
