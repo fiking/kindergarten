@@ -176,7 +176,7 @@ class LLVMBuilder(val arm: Boolean) {
     }
 
     fun allocStackVar(target: LLVMVariable) {
-        localCode.appendLine("$target = alloca ${target.type}, align ${target.type.align}")
+        localCode.appendLine("$target = alloca ${target.getType()}, align ${target.type.align}")
     }
 
     fun allocStaticVar(target: LLVMVariable) {
@@ -236,5 +236,9 @@ class LLVMBuilder(val arm: Boolean) {
     fun loadVariableOffset(target: LLVMVariable, source: LLVMVariable, index: LLVMConstant) {
         val code = "$target = getelementptr inbounds ${source.type} $source, ${index.type} ${index.value}"
         localCode.appendLine(code)
+    }
+
+    fun copyVariableRef(to: LLVMVariable, from: LLVMVariable) {
+        var i = 1
     }
 }
