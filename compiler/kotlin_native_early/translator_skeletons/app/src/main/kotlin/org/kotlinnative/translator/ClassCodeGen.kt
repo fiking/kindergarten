@@ -7,11 +7,10 @@ import org.jetbrains.kotlin.psi.KtParameter
 import org.jetbrains.kotlin.psi.KtUserType
 import org.jetbrains.kotlin.resolve.BindingContext
 import org.jetbrains.kotlin.resolve.annotations.argumentValue
-import org.kotlinnative.translator.exceptions.TranslationException
 import org.kotlinnative.translator.llvm.LLVMBuilder
 import org.kotlinnative.translator.llvm.LLVMClassVariable
 import org.kotlinnative.translator.llvm.LLVMFunctionDescriptor
-import org.kotlinnative.translator.llvm.LLVMLocalScope
+import org.kotlinnative.translator.llvm.LLVMRegisterScope
 import org.kotlinnative.translator.llvm.LLVMVariable
 import org.kotlinnative.translator.llvm.types.LLVMCharType
 import org.kotlinnative.translator.llvm.types.LLVMReferenceType
@@ -82,17 +81,17 @@ class ClassCodeGen(val state: TranslationState, val clazz: KtClass, val codeBuil
         generateLoadArguments(thisField)
         generateAssignments()
         generateReturn()
-        codeBuilder.addVoidReturn()
+        codeBuilder.addAnyReturn(LLVMVoidType())
         codeBuilder.addEndExpression()
     }
 
     private fun generateLoadArguments(thisField: LLVMVariable) {
         val thisVariable = LLVMVariable("${thisField.label}", thisField.type, thisField.label,
-            LLVMLocalScope(),1)
+            LLVMRegisterScope(),1)
         codeBuilder.loadArgument(thisVariable, false)
 
         fields.forEach {
-            val loadVariable = LLVMVariable("%${it.label}", it.type, it.label, LLVMLocalScope())
+            val loadVariable = LLVMVariable("%${it.label}", it.type, it.label, LLVMRegisterScope())
             codeBuilder.loadArgument(loadVariable)
         }
     }
@@ -100,16 +99,16 @@ class ClassCodeGen(val state: TranslationState, val clazz: KtClass, val codeBuil
     private fun generateAssignments() {
         fields.forEach {
             val argument = codeBuilder.getNewVariable(it.type)
-            codeBuilder.loadVariable(argument, LLVMVariable("${it.label}.addr", it.type, "", scope = LLVMLocalScope(), 1))
+            codeBuilder.loadVariable(argument, LLVMVariable("${it.label}.addr", it.type, "", scope = LLVMRegisterScope(), 1))
             val classField = codeBuilder.getNewVariable(it.type, 1)
-            codeBuilder.loadClassField(classField, LLVMVariable("%instance.addr", type, "", scope = LLVMLocalScope(),1), (it as LLVMClassVariable).offset)
+            codeBuilder.loadClassField(classField, LLVMVariable("%instance.addr", type, "", scope = LLVMRegisterScope(),1), (it as LLVMClassVariable).offset)
             codeBuilder.storeVariable(classField, argument)
         }
     }
 
     private fun generateReturn() {
-        val dst = LLVMVariable("%instance", type, "", scope = LLVMLocalScope(),1)
-        val src = LLVMVariable("%instance.addr", type, "", scope = LLVMLocalScope(),1)
+        val dst = LLVMVariable("%instance", type, "", scope = LLVMRegisterScope(),1)
+        val src = LLVMVariable("%instance.addr", type, "", scope = LLVMRegisterScope(),1)
         val castedDst = codeBuilder.bitcast(dst, LLVMCharType())
         val castedSrc = codeBuilder.bitcast(src, LLVMCharType())
         codeBuilder.memcpy(castedDst, castedSrc, size)

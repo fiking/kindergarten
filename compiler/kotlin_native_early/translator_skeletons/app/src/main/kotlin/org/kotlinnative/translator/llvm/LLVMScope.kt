@@ -2,10 +2,10 @@ package org.kotlinnative.translator.llvm
 
 open class LLVMScope
 
-class LLVMGlobalScope : LLVMScope() {
+class LLVMVariableScope : LLVMScope() {
     override fun toString(): String = "@"
 }
 
-class LLVMLocalScope : LLVMScope() {
+class LLVMRegisterScope : LLVMScope() {
     override fun toString(): String = "%"
 }

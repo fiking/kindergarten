@@ -1,7 +1,5 @@
 package org.kotlinnative.translator
 
-import org.jetbrains.kotlin.ir.builders.Scope
-import org.kotlinnative.translator.llvm.LLVMLocalScope
 import org.kotlinnative.translator.llvm.LLVMScope
 import org.kotlinnative.translator.llvm.LLVMVariable
 import org.kotlinnative.translator.llvm.types.LLVMType

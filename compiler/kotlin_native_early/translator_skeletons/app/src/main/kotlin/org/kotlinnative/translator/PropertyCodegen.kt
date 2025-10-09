@@ -5,9 +5,9 @@ import org.jetbrains.kotlin.psi.KtProperty
 import org.jetbrains.kotlin.resolve.BindingContext
 import org.jetbrains.kotlin.types.KotlinType
 import org.kotlinnative.translator.llvm.LLVMBuilder
-import org.kotlinnative.translator.llvm.LLVMLocalScope
 import org.kotlinnative.translator.llvm.LLVMMapStandardType
 import org.kotlinnative.translator.llvm.LLVMVariable
+import org.kotlinnative.translator.llvm.LLVMVariableScope
 
 class PropertyCodegen(val state: TranslationState, val property: KtProperty, val codeBuilder: LLVMBuilder) {
     private val variableManager = state.variableManager
@@ -23,7 +23,7 @@ class PropertyCodegen(val state: TranslationState, val property: KtProperty, val
                 "@" + property.name,
                 variableType,
                 property.name.toString(),
-                LLVMLocalScope(),
+                LLVMVariableScope(),
                 pointer = 1
             )
             variableManager.addGlobalVariable(property.name.toString(), variable)
