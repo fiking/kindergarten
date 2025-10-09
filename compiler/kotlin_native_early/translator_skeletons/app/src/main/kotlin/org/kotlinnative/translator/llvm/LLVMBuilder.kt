@@ -6,6 +6,7 @@ import org.jetbrains.kotlin.psi.KtSimpleNameExpression
 import org.kotlinnative.translator.llvm.types.LLVMByteType
 import org.kotlinnative.translator.llvm.types.LLVMIntType
 import org.kotlinnative.translator.llvm.types.LLVMNullType
+import org.kotlinnative.translator.llvm.types.LLVMReferenceType
 import org.kotlinnative.translator.llvm.types.LLVMStringType
 import org.kotlinnative.translator.llvm.types.LLVMType
 
@@ -92,7 +93,7 @@ class LLVMBuilder(val arm: Boolean) {
                     return result
                 }
 
-                if (firstOp.pointer > 0 && secondOp.pointer > 0) {
+                if (firstOp.type is LLVMReferenceType && firstOp.pointer > 0 && secondOp.pointer > 0) {
                     return secondOp as LLVMVariable
                 }
 

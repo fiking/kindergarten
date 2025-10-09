@@ -31,11 +31,11 @@ fun LLVMMapStandardType(name: String, type: KotlinType?, scope: LLVMScope = LLVM
             pointer = 1
         )
 
-        type.toString() == "Int" -> LLVMVariable(name, LLVMIntType(), type.toString(), scope)
-        type.toString() == "Double" -> LLVMVariable(name, LLVMDoubleType(), type.toString(), scope)
-        type.toString() == "Byte" -> LLVMVariable(name, LLVMByteType(), type.toString(), scope)
-        type.toString() == "Char" -> LLVMVariable(name, LLVMCharType(), type.toString(), scope)
-        type.toString() == "Boolean" -> LLVMVariable(name, LLVMBooleanType(), type.toString(), scope)
+        type.toString() == "Int" -> LLVMVariable(name, LLVMIntType(), name, scope)
+        type.toString() == "Double" -> LLVMVariable(name, LLVMDoubleType(), name, scope)
+        type.toString() == "Byte" -> LLVMVariable(name, LLVMByteType(), name, scope)
+        type.toString() == "Char" -> LLVMVariable(name, LLVMCharType(), name, scope)
+        type.toString() == "Boolean" -> LLVMVariable(name, LLVMBooleanType(), name, scope)
         type.isUnit() -> LLVMVariable("", LLVMVoidType(), "", scope)
         type.isMarkedNullable -> LLVMVariable(name, LLVMReferenceType("${type.toString().dropLast(1)}"), name, scope, pointer = 1)
         else -> LLVMVariable(name, LLVMReferenceType("$type"), name, scope, pointer = 1)
