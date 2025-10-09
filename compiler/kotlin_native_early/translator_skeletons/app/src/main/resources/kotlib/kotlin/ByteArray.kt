@@ -1,6 +1,4 @@
-package org.kotlinnative.kotlib.Arrays
-
-external fun malloc(size: Int) : Byte
+package kotlib.kotlin
 external fun malloc_array(size: Int) : Int
 external fun kotlinclib_get_byte(src: Int, index: Int) : Byte
 external fun kotlinclib_set_byte(src: Int, index: Int, value: Byte)

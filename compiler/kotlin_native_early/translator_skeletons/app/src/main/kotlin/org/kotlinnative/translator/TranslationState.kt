@@ -20,6 +20,7 @@ import org.jetbrains.kotlin.config.CompilerConfiguration
 import org.jetbrains.kotlin.config.JVMConfigurationKeys
 import org.jetbrains.kotlin.ir.backend.jvm.jvmResolveLibraries
 import org.jetbrains.kotlin.resolve.BindingContext
+import org.kotlinnative.translator.llvm.LLVMBuilder
 import org.kotlinnative.translator.llvm.LLVMVariable
 
 class TranslationState(
@@ -32,6 +33,7 @@ class TranslationState(
     var classes = HashMap<String, ClassCodegen>()
     var objects = HashMap<String, ObjectCodegen>()
     var properties = HashMap<String, PropertyCodegen>()
+    val codeBuilder = LLVMBuilder(arm)
 }
 
 fun parseAndAnalyze(sources: List<String>, disposer: Disposable, arm: Boolean = false): TranslationState {
