@@ -2,11 +2,11 @@ package org.kotlinnative.translator
 
 import com.intellij.psi.PsiElement
 import org.jetbrains.kotlin.descriptors.ClassDescriptor
+import org.jetbrains.kotlin.psi.KtClass
 import org.jetbrains.kotlin.psi.KtClassOrObject
 import org.jetbrains.kotlin.psi.KtDeclaration
 import org.jetbrains.kotlin.psi.KtNamedDeclaration
 import org.jetbrains.kotlin.psi.KtNamedFunction
-import org.jetbrains.kotlin.psi.KtParameter
 import org.jetbrains.kotlin.psi.KtProperty
 import org.jetbrains.kotlin.resolve.BindingContext
 import org.jetbrains.kotlin.types.KotlinType
@@ -21,16 +21,22 @@ import org.kotlinnative.translator.llvm.types.LLVMReferenceType
 import org.kotlinnative.translator.llvm.types.LLVMType
 import org.kotlinnative.translator.llvm.types.LLVMVoidType
 
-abstract class StructCodegen(open val state: TranslationState, open val variableManager: VariableManager, open val classOrObject: KtClassOrObject,
+abstract class StructCodegen(open val state: TranslationState,
+                             open val variableManager: VariableManager,
+                             open val classOrObject: KtClassOrObject,
                              val classDescriptor: ClassDescriptor,
-                             open val codeBuilder: LLVMBuilder) {
+                             open val codeBuilder: LLVMBuilder,
+                             val prefix: String = "") {
     val fields = ArrayList<LLVMVariable>()
     val fieldsIndex = HashMap<String, LLVMClassVariable>()
+    val nestedClasses = HashMap<String, ClassCodegen>()
     val constructorFields = ArrayList<LLVMVariable>()
-    abstract val type: LLVMType
+    abstract val type: LLVMReferenceType
     abstract var size: Int
     var methods = HashMap<String, FunctionCodegen>()
-    abstract val structName: String
+    abstract var structName: String
+    val fullName: String
+        get() = "${if (prefix.isNotEmpty()) "${prefix}_" else ""}$structName"
 
 
     fun generate(declarations: List<KtDeclaration>) {
@@ -68,14 +74,19 @@ abstract class StructCodegen(open val state: TranslationState, open val variable
                     fieldsIndex[field.label] = field
                     size += field.type.size
                 }
+                is KtClass -> {
+                    nestedClasses.put(declaration.name!!,
+                        ClassCodegen(state,
+                            VariableManager(state.globalVariableCollection),
+                            declaration, codeBuilder,
+                            fullName))
+                }
             }
         }
     }
 
     private fun generateStruct() {
-        val name = classDescriptor.name.identifier
-
-        codeBuilder.createClass(name, fields)
+        codeBuilder.createClass(fullName, fields)
     }
 
     private fun generatePrimaryConstructor() {
@@ -90,7 +101,7 @@ abstract class StructCodegen(open val state: TranslationState, open val variable
         argFields.add(classVal)
         argFields.addAll(constructorFields)
 
-        codeBuilder.addLLVMCode(LLVMFunctionDescriptor(classDescriptor.name.identifier, argFields,
+        codeBuilder.addLLVMCode(LLVMFunctionDescriptor(fullName, argFields,
             LLVMVoidType(), arm = state.arm))
 
         codeBuilder.addStartExpression()

@@ -12,13 +12,17 @@ import org.kotlinnative.translator.llvm.types.LLVMEnumItemType
 import org.kotlinnative.translator.llvm.types.LLVMReferenceType
 import org.kotlinnative.translator.llvm.types.LLVMType
 
-class ClassCodegen(override val state: TranslationState, override val variableManager: VariableManager, val clazz: KtClass, override val codeBuilder: LLVMBuilder) :
-    StructCodegen(state, variableManager, clazz, state.bindingContext?.get(BindingContext.CLASS, clazz) ?: throw TranslationException(), codeBuilder) {
+class ClassCodegen(override val state: TranslationState,
+                   override val variableManager: VariableManager,
+                   val clazz: KtClass,
+                   override val codeBuilder: LLVMBuilder,
+                   prefix: String = "") :
+    StructCodegen(state, variableManager, clazz, state.bindingContext?.get(BindingContext.CLASS, clazz) ?: throw TranslationException(), codeBuilder, prefix) {
     val annotation: Boolean
 
     override var size: Int = 0
-    override val structName: String = clazz.name.toString()
-    override val type: LLVMType = LLVMReferenceType(clazz.name.toString(), "class", byRef = true)
+    override var structName: String = clazz.name!!
+    override val type: LLVMReferenceType = LLVMReferenceType(clazz.name.toString(), "class", byRef = true)
 
     init {
         val descriptor = state.bindingContext?.get(BindingContext.CLASS, clazz) //?: throw TranslationException()
@@ -26,6 +30,10 @@ class ClassCodegen(override val state: TranslationState, override val variableMa
         annotation = descriptor?.kind == ClassKind.ANNOTATION_CLASS
         indexFields(descriptor, parameterList)
         generateInnerFields(clazz.declarations)
+
+        if (prefix.length > 0) {
+            type.prefix = "${type.prefix}_$prefix"
+        }
         type.size = size
     }
 
@@ -59,5 +67,6 @@ class ClassCodegen(override val state: TranslationState, override val variableMa
     fun generate() {
         if (annotation) return
         generate(clazz.declarations)
+        nestedClasses.forEach { x, classCodegen -> classCodegen.generate() }
     }
 }

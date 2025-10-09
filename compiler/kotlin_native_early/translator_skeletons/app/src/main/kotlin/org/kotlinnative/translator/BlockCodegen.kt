@@ -89,10 +89,22 @@ abstract class BlockCodegen(open val state: TranslationState, open val variableM
 
     private fun evaluateDotExpression(expr: KtDotQualifiedExpression, scopeDepth: Int): LLVMSingleValue? {
         val receiverName = expr.receiverExpression.text
-        val selectorName = expr.selectorExpression!!.text
+        val selectorName = expr.selectorExpression!!.text!!
 
-        val receiver = variableManager.getLLVMValue(receiverName)!!
+        val receiver = variableManager.getLLVMValue(receiverName)
+        if (receiver != null) {
+            return evaluateMemberMethodOrField(receiver, selectorName, scopeDepth, expr.lastChild)
+        }
 
+        val clazz = state.classes.get(receiverName) ?: return null
+        return evaluateClassScopedDotExpression(clazz, selectorName, scopeDepth)
+    }
+
+    private fun  evaluateClassScopedDotExpression(clazz: ClassCodegen, selectorName: String, scopeDepth: Int): LLVMSingleValue? {
+        return null
+    }
+
+    private fun evaluateMemberMethodOrField(receiver: LLVMVariable, selectorName: String, scopeDepth: Int, call: PsiElement): LLVMSingleValue? {
         val clazz = state.classes[(receiver.type as LLVMReferenceType).type] ?: state.objects[(receiver.type as LLVMReferenceType).type]!!
         val field = clazz.fieldsIndex[selectorName]
         if (field != null) {
@@ -103,12 +115,12 @@ abstract class BlockCodegen(open val state: TranslationState, open val variableM
             val methodName = clazz.structName + '.' + selectorName.substringBefore('(')
             val method = clazz.methods[methodName]!!
             val returnType = clazz.methods[methodName]!!.returnType!!.type
-            val methodArgs = mutableListOf<LLVMSingleValue>(receiver)
 
-            val names = parseArgList(expr.lastChild as KtCallExpression, scopeDepth)
+            val names = parseArgList(call as KtCallExpression, scopeDepth)
             val loadedArgs = loadArgsIfRequired(names, method.args)
             val callArgs = mutableListOf<LLVMSingleValue>(receiver)
             callArgs.addAll(loadedArgs)
+
 
             return evaluateFunctionCallExpression(LLVMVariable(methodName, returnType, scope = LLVMVariableScope()), callArgs)
         }
