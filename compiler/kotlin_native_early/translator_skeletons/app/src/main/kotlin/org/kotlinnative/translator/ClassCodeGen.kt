@@ -16,7 +16,7 @@ class ClassCodegen(override val state: TranslationState, override val variableMa
     StructCodegen(state, variableManager, clazz, state.bindingContext?.get(BindingContext.CLASS, clazz) ?: throw TranslationException(), codeBuilder) {
     val annotation: Boolean
 
-    override val size: Int
+    override var size: Int = 0
     override val structName: String = clazz.name.toString()
     override val type: LLVMType = LLVMReferenceType(clazz.name.toString(), "class", byRef = true)
 
@@ -24,46 +24,40 @@ class ClassCodegen(override val state: TranslationState, override val variableMa
         val descriptor = state.bindingContext?.get(BindingContext.CLASS, clazz) //?: throw TranslationException()
         val parameterList = clazz.getPrimaryConstructorParameterList()?.parameters ?: listOf()
         annotation = descriptor?.kind == ClassKind.ANNOTATION_CLASS
-        size = indexFields(descriptor, parameterList)
+        indexFields(descriptor, parameterList)
+        generateInnerFields(clazz.declarations)
+        type.size = size
     }
 
-    private fun indexFields(descriptor: ClassDescriptor?, parameters: List<KtParameter>): Int {
+    private fun indexFields(descriptor: ClassDescriptor?, parameters: List<KtParameter>) {
         if (annotation) {
-            return 0
+            return
         }
-        var offset = 0
-        var currentSize = 0
+
         for (field in parameters) {
-            val item = resolveType(field)
-            item.offset = offset
+            val item = resolveType(field, state.bindingContext?.get(BindingContext.TYPE, field.typeReference)!!)
+            item.offset = fields.size
+
+            constructorFields.add(item)
             fields.add(item)
             fieldsIndex[item.label] = item
-            currentSize += type.size
-            offset++
+            size += type.size
         }
 
 
         when (descriptor?.kind) {
             ClassKind.ENUM_CLASS -> {
                 val item = LLVMClassVariable("enum_item", LLVMEnumItemType())
-                item.offset = offset
+                item.offset = fields.size
                 fields.add(item)
                 fieldsIndex["enum_item"] = item
-                currentSize += type.size
-                offset++
+                size += type.size
             }
             else -> null
         }
-
-        return currentSize
     }
     fun generate() {
         if (annotation) return
         generate(clazz.declarations)
-    }
-
-    private fun generateStruct() {
-        val name = clazz.name!!
-        codeBuilder.createClass(name, fields)
     }
 }

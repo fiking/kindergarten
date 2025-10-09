@@ -138,7 +138,7 @@ abstract class BlockCodegen(open val state: TranslationState, open val variableM
 
         if (state.classes.containsKey(function)) {
             val descriptor = state.classes[function] ?: return null
-            val args = loadArgsIfRequired(names, descriptor.fields)
+            val args = loadArgsIfRequired(names, descriptor.constructorFields)
             return evaluateConstructorCallExpression(LLVMVariable(function, descriptor.type, scope = LLVMVariableScope()), args)
         }
 
@@ -197,8 +197,9 @@ abstract class BlockCodegen(open val state: TranslationState, open val variableM
     }).toList()
 
     private fun evaluateConstructorCallExpression(function: LLVMVariable, names: List<LLVMSingleValue>): LLVMSingleValue? {
-        val result = codeBuilder.getNewVariable(function.type, pointer = 1)
+        val result = codeBuilder.getNewVariable(function.type)
         codeBuilder.allocStaticVar(result)
+        result.pointer += 1
 
         val args = ArrayList<LLVMSingleValue>()
         args.add(result)
@@ -380,7 +381,7 @@ abstract class BlockCodegen(open val state: TranslationState, open val variableM
                     return null
                 }
 
-                val newVar = variableManager.receiveVariable(identifier, LLVMMapStandardType(identifier, variable.type).type, LLVMRegisterScope(), pointer = 1)
+                val newVar = variableManager.receiveVariable(identifier, assignExpression.type!!, LLVMRegisterScope(), pointer = 1)
                 codeBuilder.addConstant(newVar, assignExpression)
                 variableManager.addVariable(identifier, newVar, scopeDepth)
             }

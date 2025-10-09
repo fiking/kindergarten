@@ -7,7 +7,7 @@ import org.kotlinnative.translator.llvm.LLVMVariable
 class LLVMShortType() : LLVMType() {
     override fun toString(): String = "i16"
     override val align: Int = 2
-    override val size: Byte = 2
+    override var size: Int = 2
     override val defaultValue: String = "0"
 
     override fun operatorLt(firstOp: LLVMSingleValue, secondOp: LLVMSingleValue): LLVMExpression =

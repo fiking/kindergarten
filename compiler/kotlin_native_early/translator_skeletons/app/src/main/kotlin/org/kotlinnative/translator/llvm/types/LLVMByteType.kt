@@ -7,7 +7,7 @@ class LLVMByteType() : LLVMType() {
     override fun toString(): String = "i8"
 
     override val align = 1
-    override val size: Byte = 1
+    override var size: Int = 1
     override val defaultValue = "0"
 
     override fun operatorLt(firstOp: LLVMSingleValue, secondOp: LLVMSingleValue): LLVMExpression =

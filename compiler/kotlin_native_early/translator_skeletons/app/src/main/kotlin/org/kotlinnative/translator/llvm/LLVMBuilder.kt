@@ -198,7 +198,7 @@ class LLVMBuilder(val arm: Boolean) {
         val size = if (target.pointer > 0) POINTER_SIZE else target.type.size
         val alloc = "$allocedVar = call i8* @${if (arm) "malloc_static" else "malloc"}(i32 $size)"
         localCode.appendLine(alloc)
-        val cast = "$target = bitcast ${allocedVar.getType()} $allocedVar to ${target.getType()}"
+        val cast = "$target = bitcast ${allocedVar.getType()} $allocedVar to ${target.getType()}*"
         localCode.appendLine(cast)
     }
 
