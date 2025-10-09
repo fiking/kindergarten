@@ -2,6 +2,7 @@ package org.kotlinnative.translator.llvm
 
 import com.intellij.psi.tree.IElementType
 import org.jetbrains.kotlin.lexer.KtTokens
+import org.jetbrains.kotlin.psi.KtSimpleNameExpression
 import org.kotlinnative.translator.llvm.types.LLVMCharType
 import org.kotlinnative.translator.llvm.types.LLVMIntType
 import org.kotlinnative.translator.llvm.types.LLVMStringType
@@ -20,7 +21,7 @@ class LLVMBuilder(val arm: Boolean) {
     private fun initBuilder() {
         val declares = arrayOf(
             "declare void @llvm.memcpy.p0i8.p0i8.i64(i8* nocapture, i8* nocapture readonly, i64, i32, i1)",
-            "declare i8* @malloc_static(i32)")
+            "declare i8* @${if (arm) "malloc_static" else "malloc"}(i32)")
         declares.forEach { globalCode.appendLine(it) }
         if (arm) {
             val funcAttributes = """attributes #0 = { nounwind "stack-protector-buffer-size"="8" "target-cpu"="cortex-m3" "target-features"="+hwdiv,+strict-align" }"""
@@ -46,6 +47,7 @@ class LLVMBuilder(val arm: Boolean) {
 
     fun clean() {
         localCode = StringBuilder()
+        globalCode = StringBuilder()
         initBuilder()
     }
 
@@ -63,6 +65,7 @@ class LLVMBuilder(val arm: Boolean) {
 
     fun addPrimitiveBinaryOperation(
         operator: IElementType,
+        referenceName: KtSimpleNameExpression,
         firstOp: LLVMSingleValue,
         secondOp: LLVMSingleValue
     ): LLVMVariable {
@@ -83,12 +86,24 @@ class LLVMBuilder(val arm: Boolean) {
                 storeVariable(result, secondNativeOp)
                 return result
             }
-            else -> throw UnsupportedOperationException("Unknown binary operator")
+            else -> addPrimitiveReferenceOperation(referenceName, firstNativeOp, secondNativeOp);
         }
 
         val resultOp = getNewVariable(llvmExpression.variableType)
         addAssignment(resultOp, llvmExpression)
         return resultOp
+    }
+
+    fun addPrimitiveReferenceOperation(referenceName: KtSimpleNameExpression, firstNativeOp: LLVMSingleValue, secondNativeOp: LLVMSingleValue): LLVMExpression {
+        return when (referenceName.getReferencedName()) {
+            "or" -> firstNativeOp.type!!.operatorOr(firstNativeOp, secondNativeOp)
+            "xor" -> firstNativeOp.type!!.operatorXor(firstNativeOp, secondNativeOp)
+            "and" -> firstNativeOp.type!!.operatorAnd(firstNativeOp, secondNativeOp)
+            "lhr" -> firstNativeOp.type!!.operatorShl(firstNativeOp, secondNativeOp)
+            "shr" -> firstNativeOp.type!!.operatorShr(firstNativeOp, secondNativeOp)
+            "ushr" -> firstNativeOp.type!!.operatorUshr(firstNativeOp, secondNativeOp)
+            else -> throw UnsupportedOperationException("Unknown binary operator")
+        }
     }
 
     fun receiveNativeValue(firstOp: LLVMSingleValue) : LLVMSingleValue = when (firstOp) {
@@ -167,7 +182,7 @@ class LLVMBuilder(val arm: Boolean) {
     fun allocStaticVar(target: LLVMVariable) {
         val allocedVar = getNewVariable(LLVMCharType(), pointer = 1)
         val size = if (target.pointer > 0) POINTER_SIZE else target.type.size
-        val alloc = "$allocedVar = call i8* @malloc_static(i32 $size)"
+        val alloc = "$allocedVar = call i8* @${if (arm) "malloc_static" else "malloc"}(i32 $size)"
         localCode.appendLine(alloc)
         val cast = "$target = bitcast ${allocedVar.getType()} $allocedVar to ${target.getType()}"
         localCode.appendLine(cast)

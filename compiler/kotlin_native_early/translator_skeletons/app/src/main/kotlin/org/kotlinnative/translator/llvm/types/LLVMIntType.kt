@@ -42,4 +42,22 @@ class LLVMIntType() : LLVMType() {
 
     override fun operatorNeq(firstOp: LLVMSingleValue, secondOp: LLVMSingleValue): LLVMExpression =
         LLVMExpression(LLVMIntType(), "icmp ne i32 $firstOp, $secondOp")
+
+    override fun operatorOr(firstOp: LLVMSingleValue, secondOp: LLVMSingleValue): LLVMExpression =
+        LLVMExpression(LLVMIntType(), "or i32 $firstOp, $secondOp")
+
+    override fun operatorAnd(firstOp: LLVMSingleValue, secondOp: LLVMSingleValue): LLVMExpression =
+        LLVMExpression(LLVMIntType(), "and i32 $firstOp, $secondOp")
+
+    override fun operatorXor(firstOp: LLVMSingleValue, secondOp: LLVMSingleValue): LLVMExpression =
+        LLVMExpression(LLVMIntType(), "xor i32 $firstOp, $secondOp")
+
+    override fun operatorShl(firstOp: LLVMSingleValue, secondOp: LLVMSingleValue): LLVMExpression =
+        LLVMExpression(LLVMIntType(), "shl i32 $firstOp, $secondOp")
+
+    override fun operatorShr(firstOp: LLVMSingleValue, secondOp: LLVMSingleValue): LLVMExpression =
+        LLVMExpression(LLVMIntType(), "ashr i32 $firstOp, $secondOp")
+
+    override fun operatorUshr(firstOp: LLVMSingleValue, secondOp: LLVMSingleValue): LLVMExpression =
+        LLVMExpression(LLVMIntType(), "lshr i32 $firstOp, $secondOp")
 }
