@@ -3,6 +3,9 @@ package org.kotlinnative.translator.llvm
 import org.jetbrains.kotlin.builtins.isFunctionTypeOrSubtype
 import org.jetbrains.kotlin.types.KotlinType
 import org.jetbrains.kotlin.types.typeUtil.isUnit
+import org.kotlinnative.translator.llvm.types.LLVMBooleanType
+import org.kotlinnative.translator.llvm.types.LLVMByteType
+import org.kotlinnative.translator.llvm.types.LLVMCharType
 
 import org.kotlinnative.translator.llvm.types.LLVMDoubleType
 import org.kotlinnative.translator.llvm.types.LLVMFunctionType
@@ -30,6 +33,9 @@ fun LLVMMapStandardType(name: String, type: KotlinType?, scope: LLVMScope = LLVM
 
         type.toString() == "Int" -> LLVMVariable(name, LLVMIntType(), type.toString(), scope)
         type.toString() == "Double" -> LLVMVariable(name, LLVMDoubleType(), type.toString(), scope)
+        type.toString() == "Byte" -> LLVMVariable(name, LLVMByteType(), type.toString(), scope)
+        type.toString() == "Char" -> LLVMVariable(name, LLVMCharType(), type.toString(), scope)
+        type.toString() == "Boolean" -> LLVMVariable(name, LLVMBooleanType(), type.toString(), scope)
         type.isUnit() -> LLVMVariable("", LLVMVoidType(), "", scope)
         type.isMarkedNullable -> LLVMVariable(name, LLVMReferenceType("${type.toString().dropLast(1)}"), name, scope, pointer = 1)
         else -> LLVMVariable(name, LLVMReferenceType("$type"), name, scope, pointer = 1)
