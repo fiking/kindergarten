@@ -11,7 +11,7 @@ import org.kotlinnative.translator.llvm.LLVMFunctionDescriptor
 import org.kotlinnative.translator.llvm.LLVMMapStandardType
 import org.kotlinnative.translator.llvm.LLVMRegisterScope
 import org.kotlinnative.translator.llvm.LLVMVariable
-import org.kotlinnative.translator.llvm.types.LLVMCharType
+import org.kotlinnative.translator.llvm.types.LLVMByteType
 import org.kotlinnative.translator.llvm.types.LLVMReferenceType
 import org.kotlinnative.translator.llvm.types.LLVMType
 import org.kotlinnative.translator.llvm.types.LLVMVoidType
@@ -113,8 +113,8 @@ abstract class StructCodegen(open val state: TranslationState, open val variable
         val dst = LLVMVariable("classvariable.this", type, scope = LLVMRegisterScope(), pointer = 1)
         val src = LLVMVariable("classvariable.this.addr", type, scope = LLVMRegisterScope(), pointer = 1)
 
-        val castedDst = codeBuilder.bitcast(dst, LLVMVariable("", LLVMCharType(), pointer = 1))
-        val castedSrc = codeBuilder.bitcast(src, LLVMVariable("", LLVMCharType(), pointer = 1))
+        val castedDst = codeBuilder.bitcast(dst, LLVMVariable("", LLVMByteType(), pointer = 1))
+        val castedSrc = codeBuilder.bitcast(src, LLVMVariable("", LLVMByteType(), pointer = 1))
 
         codeBuilder.memcpy(castedDst, castedSrc, size)
     }

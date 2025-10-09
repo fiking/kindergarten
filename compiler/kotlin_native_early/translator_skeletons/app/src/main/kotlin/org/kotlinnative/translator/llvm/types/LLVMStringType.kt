@@ -5,7 +5,7 @@ class LLVMStringType(override val length: Int) : LLVMArray, LLVMType() {
     override val align = 8
     override val defaultValue = ""
 
-    override fun basicType() = LLVMCharType()
+    override fun basicType() = LLVMByteType()
     override fun toString(): String = "i8*"
     override fun fullType() = "[${length + 1} x i8]"
 }

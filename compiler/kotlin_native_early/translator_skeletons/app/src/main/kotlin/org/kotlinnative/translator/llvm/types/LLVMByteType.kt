@@ -2,9 +2,8 @@ package org.kotlinnative.translator.llvm.types
 
 import org.kotlinnative.translator.llvm.LLVMExpression
 import org.kotlinnative.translator.llvm.LLVMSingleValue
-import org.kotlinnative.translator.llvm.LLVMVariable
 
-class LLVMCharType() : LLVMType() {
+class LLVMByteType() : LLVMType() {
     override fun toString(): String = "i8"
 
     override val align = 1

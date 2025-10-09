@@ -3,7 +3,6 @@ package org.kotlinnative.translator.llvm.types
 import org.kotlinnative.translator.exceptions.UnimplementedException
 import org.kotlinnative.translator.llvm.LLVMExpression
 import org.kotlinnative.translator.llvm.LLVMSingleValue
-import org.kotlinnative.translator.llvm.LLVMVariable
 
 abstract class LLVMType() : Cloneable {
     open fun operatorPlus(firstOp: LLVMSingleValue, secondOp: LLVMSingleValue) : LLVMExpression = throw UnimplementedException()
@@ -33,7 +32,7 @@ abstract class LLVMType() : Cloneable {
 fun parseLLVMType(type: String): LLVMType = when(type) {
     "i32" -> LLVMIntType()
     "i16" -> LLVMShortType()
-    "i8" -> LLVMCharType()
+    "i8" -> LLVMByteType()
     "i1" -> LLVMBooleanType()
     "double" -> LLVMDoubleType()
     "Unit" -> LLVMVoidType()

@@ -30,10 +30,11 @@ import org.kotlinnative.translator.debug.debugPrintNode
 import org.kotlinnative.translator.llvm.*
 import org.kotlinnative.translator.llvm.types.LLVMArray
 import org.kotlinnative.translator.llvm.types.LLVMBooleanType
-import org.kotlinnative.translator.llvm.types.LLVMCharType
+import org.kotlinnative.translator.llvm.types.LLVMByteType
 import org.kotlinnative.translator.llvm.types.LLVMDoubleType
 import org.kotlinnative.translator.llvm.types.LLVMFunctionType
 import org.kotlinnative.translator.llvm.types.LLVMIntType
+import org.kotlinnative.translator.llvm.types.LLVMNullType
 import org.kotlinnative.translator.llvm.types.LLVMReferenceType
 import org.kotlinnative.translator.llvm.types.LLVMStringType
 import org.kotlinnative.translator.llvm.types.LLVMType
@@ -319,23 +320,9 @@ class FunctionCodegen(val state: TranslationState, val variableManager: Variable
         return when (element) {
             is LeafPsiElement -> evaluateLeafPsiElement(element, scopeDepth)
             is KtConstantExpression -> evaluateConstantExpression(element)
-            is KtTypeReference -> evaluateTypeReference(element)
             KtTokens.INTEGER_LITERAL -> null
             else -> null
         }
-    }
-
-    private fun evaluateTypeReference(element: KtTypeReference): LLVMSingleValue? {
-        val type = element.typeElement as KtUserType
-        val operator = element.getNextSiblingIgnoringWhitespaceAndComments()
-        val value = operator?.getNextSiblingIgnoringWhitespaceAndComments() as KtConstantExpression
-
-        when (type) {
-            is KtUserType -> {
-                val i = 1
-            }
-        }
-        return null
     }
 
     private fun evaluateConstantExpression(expr: KtConstantExpression) : LLVMConstant {
@@ -343,7 +330,8 @@ class FunctionCodegen(val state: TranslationState, val variableManager: Variable
             KtNodeTypes.BOOLEAN_CONSTANT -> LLVMBooleanType()
             KtNodeTypes.INTEGER_CONSTANT -> LLVMIntType()
             KtNodeTypes.FLOAT_CONSTANT -> LLVMDoubleType()
-            KtNodeTypes.CHARACTER_CONSTANT -> LLVMCharType()
+            KtNodeTypes.CHARACTER_CONSTANT -> LLVMByteType()
+            KtNodeTypes.NULL -> LLVMNullType()
             else -> throw IllegalArgumentException("Unknown type")
         }
         return LLVMConstant(expr.node.firstChildNode.text, type, pointer = 0)
@@ -359,16 +347,10 @@ class FunctionCodegen(val state: TranslationState, val variableManager: Variable
     }
 
     private fun evaluateValExpression(element: KtProperty, scopeDepth: Int): LLVMVariable? {
-//        val variable = state.bindingContext?.get(BindingContext.VARIABLE, element)
-//        val identifier = variable?.name.toString()
-//
-//        val assignExpression = evaluateExpression(element.delegateExpressionOrInitializer, scopeDepth) ?: return null
-        val identifierNode = element.getNextSiblingIgnoringWhitespaceAndComments()
-        val eq = identifierNode?.getNextSiblingIgnoringWhitespaceAndComments() ?: return null
-        val identifier = identifierNode!!.text
+        val variable = state.bindingContext?.get(BindingContext.VARIABLE, element)
+        val identifier = variable?.name.toString()
 
-        val assignExpression = evaluateExpression(eq.getNextSiblingIgnoringWhitespaceAndComments(), scopeDepth) ?: return null
-
+        val assignExpression = evaluateExpression(element.delegateExpressionOrInitializer, scopeDepth) ?: return null
 
         when (assignExpression) {
             is LLVMVariable -> {
@@ -383,6 +365,22 @@ class FunctionCodegen(val state: TranslationState, val variableManager: Variable
                 }
             }
             is LLVMConstant -> {
+                if (assignExpression.type is LLVMNullType) {
+                    val reference = LLVMMapStandardType(identifier, variable?.type)
+                    if (state.classes.containsKey(variable?.type.toString().dropLast(1))) {
+                        (reference.type as LLVMReferenceType).prefix = "class"
+                    }
+
+                    codeBuilder.allocStackVar(reference)
+                    reference.pointer += 1
+
+                    codeBuilder.storeNull(reference)
+                    val result = codeBuilder.loadAndGetVariable(reference)
+
+                    variableManager.addVariable(identifier, result, scopeDepth)
+                    return null
+                }
+
                 val newVar = variableManager.receiveVariable(identifier, assignExpression.type!!, LLVMRegisterScope(), pointer = 1)
 
                 codeBuilder.addConstant(newVar, assignExpression)
@@ -400,8 +398,8 @@ class FunctionCodegen(val state: TranslationState, val variableManager: Variable
         val retVar = evaluateExpression(next, scopeDepth) as LLVMSingleValue
         when (returnType.type) {
             is LLVMReferenceType -> {
-                val src = codeBuilder.bitcast(retVar as LLVMVariable, LLVMVariable("", LLVMCharType(), pointer = 1))
-                val dst = codeBuilder.bitcast(returnType, LLVMVariable("", LLVMCharType(), pointer = 1))
+                val src = codeBuilder.bitcast(retVar as LLVMVariable, LLVMVariable("", LLVMByteType(), pointer = 1))
+                val dst = codeBuilder.bitcast(returnType, LLVMVariable("", LLVMByteType(), pointer = 1))
                 val size = state.classes[(retVar.type as LLVMReferenceType).type]!!.size
                 codeBuilder.memcpy(dst, src, size)
                 codeBuilder.addAnyReturn(LLVMVoidType())
@@ -544,7 +542,6 @@ class FunctionCodegen(val state: TranslationState, val variableManager: Variable
 
     private fun copyVariable(from: LLVMVariable, to: LLVMVariable) = when (from.type) {
         is LLVMStringType -> codeBuilder.storeString(to, from, 0)
-        is LLVMReferenceType -> codeBuilder.copyVariableRef(to, from)
         else -> codeBuilder.copyVariableValue(to, from)
     }
 }

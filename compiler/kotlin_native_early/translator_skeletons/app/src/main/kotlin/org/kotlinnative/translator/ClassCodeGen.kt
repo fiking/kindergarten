@@ -2,23 +2,15 @@ package org.kotlinnative.translator
 
 import org.jetbrains.kotlin.descriptors.ClassDescriptor
 import org.jetbrains.kotlin.descriptors.ClassKind
-import org.jetbrains.kotlin.descriptors.annotations.Annotations
 import org.jetbrains.kotlin.psi.KtClass
-import org.jetbrains.kotlin.psi.KtNamedFunction
 import org.jetbrains.kotlin.psi.KtParameter
 import org.jetbrains.kotlin.resolve.BindingContext
 import org.kotlinnative.translator.exceptions.TranslationException
 import org.kotlinnative.translator.llvm.LLVMBuilder
 import org.kotlinnative.translator.llvm.LLVMClassVariable
-import org.kotlinnative.translator.llvm.LLVMFunctionDescriptor
-import org.kotlinnative.translator.llvm.LLVMMapStandardType
-import org.kotlinnative.translator.llvm.LLVMRegisterScope
-import org.kotlinnative.translator.llvm.LLVMVariable
-import org.kotlinnative.translator.llvm.types.LLVMCharType
 import org.kotlinnative.translator.llvm.types.LLVMEnumItemType
 import org.kotlinnative.translator.llvm.types.LLVMReferenceType
 import org.kotlinnative.translator.llvm.types.LLVMType
-import org.kotlinnative.translator.llvm.types.LLVMVoidType
 
 class ClassCodegen(override val state: TranslationState, override val variableManager: VariableManager, val clazz: KtClass, override val codeBuilder: LLVMBuilder) :
     StructCodegen(state, variableManager, state.bindingContext?.get(BindingContext.CLASS, clazz) ?: throw TranslationException(), codeBuilder) {

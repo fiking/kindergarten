@@ -3,7 +3,7 @@ package org.kotlinnative.translator.llvm
 import com.intellij.psi.tree.IElementType
 import org.jetbrains.kotlin.lexer.KtTokens
 import org.jetbrains.kotlin.psi.KtSimpleNameExpression
-import org.kotlinnative.translator.llvm.types.LLVMCharType
+import org.kotlinnative.translator.llvm.types.LLVMByteType
 import org.kotlinnative.translator.llvm.types.LLVMIntType
 import org.kotlinnative.translator.llvm.types.LLVMStringType
 import org.kotlinnative.translator.llvm.types.LLVMType
@@ -153,7 +153,7 @@ class LLVMBuilder(val arm: Boolean) {
         localCode.appendLine(code)
     }
 
-    fun storeVariable(target: LLVMVariable, source: LLVMSingleValue) {
+    fun storeVariable(target: LLVMSingleValue, source: LLVMSingleValue) {
         val code = "store ${source.getType()} $source, ${target.getType()} $target, align ${source.type?.align!!}"
         localCode.appendLine(code)
     }
@@ -180,7 +180,7 @@ class LLVMBuilder(val arm: Boolean) {
     }
 
     fun allocStaticVar(target: LLVMVariable) {
-        val allocedVar = getNewVariable(LLVMCharType(), pointer = 1)
+        val allocedVar = getNewVariable(LLVMByteType(), pointer = 1)
         val size = if (target.pointer > 0) POINTER_SIZE else target.type.size
         val alloc = "$allocedVar = call i8* @${if (arm) "malloc_static" else "malloc"}(i32 $size)"
         localCode.appendLine(alloc)
@@ -238,12 +238,13 @@ class LLVMBuilder(val arm: Boolean) {
         localCode.appendLine(code)
     }
 
-    fun copyVariableRef(to: LLVMVariable, from: LLVMVariable) {
-        var i = 1
-    }
-
     fun addGlobalIntialize(target: LLVMVariable, classType: LLVMType) {
         val code = "$target = internal global $classType zeroinitializer, align ${classType.align}"
-        globalCode.appendln(code)
+        globalCode.appendLine(code)
+    }
+
+    fun storeNull(result: LLVMVariable) {
+        val code = "store ${result.getType().dropLast(1)} null, ${result.getType()} $result, align $POINTER_SIZE"
+        localCode.appendLine(code)
     }
 }
