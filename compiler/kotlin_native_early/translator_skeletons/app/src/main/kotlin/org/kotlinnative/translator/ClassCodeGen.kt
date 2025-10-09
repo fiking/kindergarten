@@ -5,9 +5,7 @@ import org.jetbrains.kotlin.descriptors.annotations.Annotations
 import org.jetbrains.kotlin.psi.KtClass
 import org.jetbrains.kotlin.psi.KtNamedFunction
 import org.jetbrains.kotlin.psi.KtParameter
-import org.jetbrains.kotlin.psi.KtUserType
 import org.jetbrains.kotlin.resolve.BindingContext
-import org.jetbrains.kotlin.resolve.annotations.argumentValue
 import org.kotlinnative.translator.llvm.LLVMBuilder
 import org.kotlinnative.translator.llvm.LLVMClassVariable
 import org.kotlinnative.translator.llvm.LLVMFunctionDescriptor
@@ -38,6 +36,7 @@ class ClassCodeGen(val state: TranslationState, val variableManager: VariableMan
         if (!annotation) {
             for (field in parameterList) {
                 val item = resolveType(field)
+                item.offset = offset
                 fields.add(item)
                 fieldsIndex[item.label] = item
                 currentSize += type.size
@@ -50,7 +49,7 @@ class ClassCodeGen(val state: TranslationState, val variableManager: VariableMan
     fun generate() {
         if (annotation) return
         generateStruct()
-        generateDefaultConstructor()
+        generatePrimaryConstructor()
 
         for (declaration in clazz.declarations) {
             when (declaration) {
@@ -83,7 +82,7 @@ class ClassCodeGen(val state: TranslationState, val variableManager: VariableMan
         codeBuilder.createClass(name, fields)
     }
 
-    private fun generateDefaultConstructor() {
+    private fun generatePrimaryConstructor() {
         val argFields = ArrayList<LLVMVariable>()
         val refType = type.makeClone() as LLVMReferenceType
         refType.addParam("sret")
@@ -108,18 +107,31 @@ class ClassCodeGen(val state: TranslationState, val variableManager: VariableMan
         codeBuilder.loadArgument(thisVariable, false)
 
         fields.forEach {
-            val loadVariable = LLVMVariable("%${it.label}", it.type, it.label, LLVMRegisterScope())
-            codeBuilder.loadArgument(loadVariable)
+            if (it.type !is LLVMReferenceType) {
+                val loadVariable =
+                    LLVMVariable("%${it.label}", it.type, it.label, LLVMRegisterScope())
+                codeBuilder.loadArgument(loadVariable)
+            }
         }
     }
 
     private fun generateAssignments() {
         fields.forEach {
-            val argument = codeBuilder.getNewVariable(it.type)
-            codeBuilder.loadVariable(argument, LLVMVariable("${it.label}.addr", it.type, "", scope = LLVMRegisterScope(), 1))
-            val classField = codeBuilder.getNewVariable(it.type, 1)
-            codeBuilder.loadClassField(classField, LLVMVariable("%classvariable.this.addr", type, "", scope = LLVMRegisterScope(),1), (it as LLVMClassVariable).offset)
-            codeBuilder.storeVariable(classField, argument)
+            when (it.type) {
+                is LLVMReferenceType -> {
+                    val classField = codeBuilder.getNewVariable(it.type, pointer = it.pointer + 1)
+                    codeBuilder.loadClassField(classField, LLVMVariable("classvariable.this.addr", type, scope = LLVMRegisterScope(), pointer = 1), (it as LLVMClassVariable).offset)
+                    codeBuilder.storeVariable(classField, it)
+                }
+                else -> {
+                    val argument = codeBuilder.getNewVariable(it.type, it.pointer)
+                    codeBuilder.loadVariable(argument, LLVMVariable("${it.label}.addr", it.type, scope = LLVMRegisterScope(), pointer = it.pointer + 1))
+                    val classField = codeBuilder.getNewVariable(it.type, pointer = 1)
+                    codeBuilder.loadClassField(classField, LLVMVariable("classvariable.this.addr", type, scope = LLVMRegisterScope(), pointer = 1), (it as LLVMClassVariable).offset)
+                    codeBuilder.storeVariable(classField, argument)
+                }
+            }
+
         }
     }
 
@@ -138,7 +150,9 @@ class ClassCodeGen(val state: TranslationState, val variableManager: VariableMan
         val result = LLVMMapStandardType(field.name!!, ktType, LLVMRegisterScope())
 
         if (result.type is LLVMReferenceType) {
-            (result.type as LLVMReferenceType).prefix = "class"
+            val type = result.type as LLVMReferenceType
+            type.prefix = "class"
+            type.byRef = true
         }
 
         if (annotations.contains("Plain")) {
