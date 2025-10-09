@@ -119,7 +119,7 @@ class LLVMBuilder(val arm: Boolean) {
     }
 
     fun loadArgument(llvmVariable: LLVMVariable, store: Boolean = true) : LLVMVariable {
-        val allocVar = LLVMVariable("${llvmVariable.label}.addr", llvmVariable.type, llvmVariable.kotlinName, LLVMRegisterScope(), 1)
+        val allocVar = LLVMVariable("${llvmVariable.label}.addr", llvmVariable.type, llvmVariable.kotlinName, LLVMRegisterScope(), pointer = llvmVariable.pointer + 1)
         addVariableByRef(allocVar, llvmVariable, store)
         return allocVar
     }
@@ -130,7 +130,7 @@ class LLVMBuilder(val arm: Boolean) {
     }
 
     fun loadClassField(target: LLVMVariable, source: LLVMVariable, offset: Int) {
-        val code = "$target = getelementptr inbounds ${source.type}, ${source.type}* $source, i32, 0, i32 $offset"
+        val code = "$target = getelementptr inbounds ${source.type}* $source, i32, 0, i32 $offset"
         llvmLocalCode.appendLine(code)
     }
 
@@ -140,7 +140,7 @@ class LLVMBuilder(val arm: Boolean) {
     }
 
     fun addVariableByRef(targetVariable: LLVMVariable, sourceVariable: LLVMVariable, store: Boolean) {
-        llvmLocalCode.appendLine("$targetVariable = alloca ${sourceVariable.type}, align ${sourceVariable.type.align}")
+        llvmLocalCode.appendLine("$targetVariable = alloca ${sourceVariable.type}${"*".repeat(sourceVariable.pointer)}, align ${sourceVariable.type.align}")
         if (store) {
             llvmLocalCode.appendLine("store ${sourceVariable.getType()} $sourceVariable, ${targetVariable.getType()}* $targetVariable, align ${targetVariable.type.align}")
         }
@@ -206,7 +206,7 @@ class LLVMBuilder(val arm: Boolean) {
     }
 
     fun loadVariableOffset(target: LLVMVariable, source: LLVMVariable, index: LLVMConstant) {
-        val code = "$target = getelementptr inbounds ${target.type}, ${source.type} $source, ${index.type} ${index.value}"
+        val code = "$target = getelementptr inbounds ${source.type} $source, ${index.type} ${index.value}"
         llvmLocalCode.appendLine(code)
     }
 }

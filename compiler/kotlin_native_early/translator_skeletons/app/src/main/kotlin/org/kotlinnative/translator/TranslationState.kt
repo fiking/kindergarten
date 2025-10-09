@@ -3,7 +3,6 @@ package org.kotlinnative.translator
 import com.intellij.openapi.Disposable
 import org.jetbrains.kotlin.analyzer.AnalysisResult
 import org.jetbrains.kotlin.cli.common.CLIConfigurationKeys
-import org.jetbrains.kotlin.cli.common.config.addKotlinSourceRoot
 import org.jetbrains.kotlin.cli.common.config.addKotlinSourceRoots
 import org.jetbrains.kotlin.cli.common.messages.AnalyzerWithCompilerReport
 import org.jetbrains.kotlin.cli.common.messages.CompilerMessageSeverity
@@ -11,26 +10,17 @@ import org.jetbrains.kotlin.cli.common.messages.CompilerMessageSourceLocation
 import org.jetbrains.kotlin.cli.common.messages.GroupingMessageCollector
 import org.jetbrains.kotlin.cli.common.messages.MessageCollector
 import org.jetbrains.kotlin.cli.common.toLogger
-import org.jetbrains.kotlin.cli.jvm.compiler.CliLightClassGenerationSupport
 import org.jetbrains.kotlin.cli.jvm.compiler.EnvironmentConfigFiles
 import org.jetbrains.kotlin.cli.jvm.compiler.KotlinCoreEnvironment
 import org.jetbrains.kotlin.cli.jvm.compiler.KotlinToJVMBytecodeCompiler
 import org.jetbrains.kotlin.cli.jvm.compiler.NoScopeRecordCliBindingTrace
 import org.jetbrains.kotlin.cli.jvm.compiler.TopDownAnalyzerFacadeForJVM
-import org.jetbrains.kotlin.cli.jvm.config.addJvmClasspathRoots
-import org.jetbrains.kotlin.codegen.optimization.common.analyze
 import org.jetbrains.kotlin.config.CommonConfigurationKeys
 import org.jetbrains.kotlin.config.CompilerConfiguration
 import org.jetbrains.kotlin.config.JVMConfigurationKeys
 import org.jetbrains.kotlin.ir.backend.jvm.jvmResolveLibraries
-import org.jetbrains.kotlin.js.dce.Analyzer
 import org.jetbrains.kotlin.resolve.BindingContext
-import org.jetbrains.kotlin.utils.PathUtil
-import org.kotlinnative.translator.debug.printFile
-import org.kotlinnative.translator.exceptions.TranslationException
-import org.kotlinnative.translator.utils.FunctionDescriptor
-import java.io.File
-import kotlin.script.dependencies.Environment
+import org.kotlinnative.translator.llvm.LLVMVariable
 
 class TranslationState(
     val environment: KotlinCoreEnvironment,
@@ -38,7 +28,7 @@ class TranslationState(
     val arm: Boolean
 ) {
     var functions = HashMap<String, FunctionCodegen>()
-    val variableManager = VariableManager()
+    val globalVariableCollection = HashMap<String, LLVMVariable>()
     var classes = HashMap<String, ClassCodeGen>()
     var properties = HashMap<String, PropertyCodegen>()
 }

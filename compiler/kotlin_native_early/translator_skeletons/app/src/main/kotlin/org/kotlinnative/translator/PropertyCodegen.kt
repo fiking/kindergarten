@@ -9,9 +9,7 @@ import org.kotlinnative.translator.llvm.LLVMMapStandardType
 import org.kotlinnative.translator.llvm.LLVMVariable
 import org.kotlinnative.translator.llvm.LLVMVariableScope
 
-class PropertyCodegen(val state: TranslationState, val property: KtProperty, val codeBuilder: LLVMBuilder) {
-    private val variableManager = state.variableManager
-
+class PropertyCodegen(val state: TranslationState, val variableManager: VariableManager, val property: KtProperty, val codeBuilder: LLVMBuilder) {
     fun generate() {
         val varInfo = state.bindingContext?.get(BindingContext.VARIABLE, property)?.compileTimeInitializer ?: return
 
