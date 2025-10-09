@@ -13,6 +13,7 @@ import org.kotlinnative.translator.llvm.LLVMMapStandardType
 import org.kotlinnative.translator.llvm.LLVMRegisterScope
 import org.kotlinnative.translator.llvm.LLVMVariable
 import org.kotlinnative.translator.llvm.types.LLVMCharType
+import org.kotlinnative.translator.llvm.types.LLVMEnumItemType
 import org.kotlinnative.translator.llvm.types.LLVMReferenceType
 import org.kotlinnative.translator.llvm.types.LLVMType
 import org.kotlinnative.translator.llvm.types.LLVMVoidType
@@ -39,6 +40,16 @@ class ClassCodeGen(val state: TranslationState, val variableManager: VariableMan
                 item.offset = offset
                 fields.add(item)
                 fieldsIndex[item.label] = item
+                currentSize += type.size
+                offset++
+            }
+        }
+        when (descriptor.kind) {
+            ClassKind.ENUM_CLASS -> {
+                val item = LLVMClassVariable("enum_item", LLVMEnumItemType())
+                item.offset = offset
+                fields.add(item)
+                fieldsIndex["enum_item"] = item
                 currentSize += type.size
                 offset++
             }
@@ -83,6 +94,8 @@ class ClassCodeGen(val state: TranslationState, val variableManager: VariableMan
     }
 
     private fun generatePrimaryConstructor() {
+        val classData = state.bindingContext?.get(BindingContext.CLASS, clazz)
+        val classKind = classData?.kind
         val argFields = ArrayList<LLVMVariable>()
         val refType = type.makeClone() as LLVMReferenceType
         refType.addParam("sret")
