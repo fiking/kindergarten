@@ -95,7 +95,7 @@ class FunctionCodegen(val state: TranslationState, val variableManager: Variable
 
     private fun generateLoadArguments() {
         args.forEach (fun(it: LLVMVariable){
-            if (it.type is LLVMFunctionType || (it.type is LLVMReferenceType && (it.type as LLVMReferenceType).uncopyable)) {
+            if (it.type is LLVMFunctionType || (it.type is LLVMReferenceType && (it.type as LLVMReferenceType).byRef)) {
                 variableManager.addVariable(it.label, LLVMVariable(it.label, it.type, it.label,
                     LLVMRegisterScope(), pointer = 1), topLevel)
                 return
@@ -178,7 +178,7 @@ class FunctionCodegen(val state: TranslationState, val variableManager: Variable
             is KtCallableReferenceExpression -> evaluateCallableReferenceExpression(expr)
             is KtReferenceExpression -> evaluateReferenceExpression(expr, scopeDepth)
             is KtIfExpression -> evaluateIfOperator(expr.firstChild as LeafPsiElement, scopeDepth + 1, true)
-            is KtDotQualifiedExpression -> evaluateDotExpression(expr)
+            is KtDotQualifiedExpression -> evaluateDotExpression(expr, scopeDepth)
             is KtStringTemplateExpression -> evaluateStringTemplateExpression(expr)
             is PsiWhiteSpace -> null
             is PsiElement -> evaluatePsiElement(expr, scopeDepth)
@@ -360,14 +360,14 @@ class FunctionCodegen(val state: TranslationState, val variableManager: Variable
         val assignExpression = evaluateExpression(eq.getNextSiblingIgnoringWhitespaceAndComments(), scopeDepth) ?: return null
         when (assignExpression) {
             is LLVMVariable -> {
-                val allocVar = variableManager.receiveVariable(identifier.text, LLVMIntType(),
+                val allocVar = variableManager.receiveVariable(identifier.text, assignExpression.type,
                     LLVMRegisterScope(), pointer = 1)
                 codeBuilder.allocaVar(allocVar)
                 variableManager.addVariable(identifier.text, allocVar, scopeDepth)
                 copyVariable(assignExpression, allocVar)
             }
             is LLVMConstant -> {
-                val newVar = variableManager.receiveVariable(identifier.text, LLVMIntType(), LLVMRegisterScope(), pointer = 1)
+                val newVar = variableManager.receiveVariable(identifier.text, assignExpression.type!!, LLVMRegisterScope(), pointer = 1)
                 codeBuilder.addConstant(newVar, assignExpression)
                 variableManager.addVariable(identifier.text, newVar, scopeDepth)
             }
@@ -490,18 +490,27 @@ class FunctionCodegen(val state: TranslationState, val variableManager: Variable
         return null
     }
 
-    private fun evaluateDotExpression(expr: KtDotQualifiedExpression) : LLVMVariable? {
+    private fun evaluateDotExpression(expr: KtDotQualifiedExpression, scopeDepth: Int) : LLVMSingleValue? {
         val receiverName = expr.receiverExpression.text
         val selectorName = expr.selectorExpression!!.text
 
         val receiver = variableManager.getLLVMValue(receiverName)!!
 
         val clazz = state.classes[(receiver.type as LLVMReferenceType).type]!!
-        val field = clazz.fieldsIndex[selectorName]!!
+        val field = clazz.fieldsIndex[selectorName]
 
-        val result = codeBuilder.getNewVariable(field.type, pointer = 1)
-        codeBuilder.loadClassField(result, receiver, field.offset)
-        return result
+        if (field != null) {
+            val result = codeBuilder.getNewVariable(field.type, pointer = 1)
+            codeBuilder.loadClassField(result, receiver, field.offset)
+            return result
+        } else {
+            val methodName = clazz.clazz.name.toString() + '.' + selectorName.substringBefore('(')
+            val method = clazz.methods[methodName]!!
+            val returnType = clazz.methods[methodName]!!.returnType.type
+
+            val names = parseArgList(expr.lastChild as KtCallExpression, scopeDepth)
+            return evaluateFunctionCallExpression(LLVMVariable(methodName, returnType, scope = LLVMRegisterScope()), names, method.args)
+        }
     }
 
     fun evaluateStringTemplateExpression(expr: KtStringTemplateExpression): LLVMSingleValue? {
