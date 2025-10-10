@@ -69,6 +69,7 @@ abstract class BlockCodegen(val state: TranslationState, val variableManager: Va
             is KtCallExpression -> evaluateCallExpression(expr, scopeDepth)
             is KtDoWhileExpression -> evaluateDoWhileExpression(expr.firstChild, scopeDepth + 1)
             is KtDotQualifiedExpression -> evaluateDotExpression(expr, scopeDepth)
+            is KtWhenExpression -> evaluateWhenExpression(expr, scopeDepth)
             is PsiElement -> evaluateExpression(expr.firstChild, scopeDepth + 1)
             null -> {
                 variableManager.pullUpwardsLevel(scopeDepth)
@@ -907,7 +908,9 @@ abstract class BlockCodegen(val state: TranslationState, val variableManager: Va
         while (successExpression is LLVMVariable && successExpression.pointer > 0) {
             successExpression = codeBuilder.loadAndGetVariable(successExpression)
         }
-        codeBuilder.storeVariable(resultVariable, successExpression ?: return)
+        if (successExpression != null) {
+            codeBuilder.storeVariable(resultVariable, successExpression)
+        }
         codeBuilder.addUnconditionalJump(endLabel)
         codeBuilder.addComment("end last condition item")
     }
@@ -921,7 +924,9 @@ abstract class BlockCodegen(val state: TranslationState, val variableManager: Va
         val targetExpression = evaluateExpression(whenExpression, scopeDepth + 1)!!
 
         val resultVariable = codeBuilder.getNewVariable(expressionType, pointer = 1)
-        codeBuilder.allocStackPointedVarAsValue(resultVariable)
+        if (expressionType !is LLVMVoidType && expressionType !is LLVMNullType) {
+            codeBuilder.allocStackPointedVarAsValue(resultVariable)
+        }
 
         var nextLabel = codeBuilder.getNewLabel(prefix = "when_start")
         val endLabel = codeBuilder.getNewLabel(prefix = "when_end")
