@@ -13,7 +13,7 @@ import org.jetbrains.kotlin.types.KotlinType
 import org.kotlinnative.translator.llvm.LLVMBuilder
 import org.kotlinnative.translator.llvm.LLVMClassVariable
 import org.kotlinnative.translator.llvm.LLVMFunctionDescriptor
-import org.kotlinnative.translator.llvm.LLVMMapStandardType
+import org.kotlinnative.translator.llvm.LLVMInstanceOfStandardType
 import org.kotlinnative.translator.llvm.LLVMRegisterScope
 import org.kotlinnative.translator.llvm.LLVMVariable
 import org.kotlinnative.translator.llvm.types.LLVMByteType
@@ -54,7 +54,7 @@ abstract class StructCodegen(open val state: TranslationState,
                 }
             }
         }
-        val classVal = LLVMVariable("classvariable.this", type, pointer = 1)
+        val classVal = LLVMVariable("classvariable.this", type, pointer = if (type.isPrimitive()) 0 else 1)
         variableManager.addVariable("this", classVal, 0)
         for (function in methods.values) {
             function.generate(classVal)
@@ -163,7 +163,7 @@ abstract class StructCodegen(open val state: TranslationState,
     protected fun resolveType(field: KtNamedDeclaration, ktType: KotlinType): LLVMClassVariable {
         val annotations = parseFieldAnnotations(field)
 
-        val result = LLVMMapStandardType(field.name!!, ktType, LLVMRegisterScope())
+        val result = LLVMInstanceOfStandardType(field.name!!, ktType, LLVMRegisterScope())
 
         if (result.type is LLVMReferenceType) {
             val type = result.type as LLVMReferenceType

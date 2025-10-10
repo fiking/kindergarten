@@ -5,7 +5,7 @@ import org.jetbrains.kotlin.psi.KtProperty
 import org.jetbrains.kotlin.resolve.BindingContext
 import org.jetbrains.kotlin.types.KotlinType
 import org.kotlinnative.translator.llvm.LLVMBuilder
-import org.kotlinnative.translator.llvm.LLVMMapStandardType
+import org.kotlinnative.translator.llvm.LLVMInstanceOfStandardType
 import org.kotlinnative.translator.llvm.LLVMVariable
 import org.kotlinnative.translator.llvm.LLVMVariableScope
 
@@ -16,7 +16,7 @@ class PropertyCodegen(val state: TranslationState, val variableManager: Variable
         val kotlinType: KotlinType? = null//varInfo.getType()
         val value = varInfo.value
         if (kotlinType != null && kotlinType.nameIfStandardType != null) {
-            val variableType = LLVMMapStandardType(property.name ?: return, kotlinType).type
+            val variableType = LLVMInstanceOfStandardType(property.name ?: return, kotlinType).type
             val variable = LLVMVariable(
                 "@" + property.name,
                 variableType,

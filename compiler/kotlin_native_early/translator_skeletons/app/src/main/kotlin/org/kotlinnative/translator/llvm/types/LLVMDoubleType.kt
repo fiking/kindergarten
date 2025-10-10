@@ -9,6 +9,7 @@ class LLVMDoubleType() : LLVMType() {
     override val align: Int = 8
     override var size: Int = 8
     override val defaultValue = "0.0"
+    override fun isPrimitive() = true
 
     override fun operatorPlus(
         firstOp: LLVMSingleValue,

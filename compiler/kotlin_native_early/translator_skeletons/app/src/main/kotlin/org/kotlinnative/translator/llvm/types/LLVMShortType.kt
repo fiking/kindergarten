@@ -9,6 +9,7 @@ class LLVMShortType() : LLVMType() {
     override val align: Int = 2
     override var size: Int = 2
     override val defaultValue: String = "0"
+    override fun isPrimitive() = true
 
     override fun operatorLt(firstOp: LLVMSingleValue, secondOp: LLVMSingleValue): LLVMExpression =
         LLVMExpression(LLVMIntType(), "icmp slt i16 $firstOp, $secondOp")

@@ -22,7 +22,11 @@ class ProjectTranslator(val state: TranslationState) {
             clazz.generate()
         }
 
-        for (function in state.functions.values) {
+        for (function in state.functions.values.filter { it.isExtensionDeclaration }) {
+            function.generate()
+        }
+
+        for (function in state.functions.values.filter { !it.isExtensionDeclaration }) {
             function.generate()
         }
     }
