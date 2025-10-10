@@ -4,14 +4,15 @@ import com.intellij.psi.PsiElement
 import com.intellij.psi.PsiWhiteSpace
 import com.intellij.psi.impl.source.tree.LeafPsiElement
 import com.intellij.psi.tree.IElementType
-import org.jetbrains.kotlin.KtNodeTypes
 import org.jetbrains.kotlin.lexer.KtTokens
 import org.jetbrains.kotlin.psi.*
 import org.jetbrains.kotlin.psi.psiUtil.getNextSiblingIgnoringWhitespaceAndComments
 import org.jetbrains.kotlin.psi.psiUtil.siblings
 import org.jetbrains.kotlin.resolve.BindingContext
+import org.jetbrains.kotlin.resolve.calls.callUtil.getType
 import org.jetbrains.kotlin.resolve.calls.util.getValueArgumentsInParentheses
 import org.jetbrains.kotlin.resolve.constants.TypedCompileTimeConstant
+import org.jetbrains.kotlin.utils.IDEAPluginsCompatibilityAPI
 import org.kotlinnative.translator.llvm.*
 import org.kotlinnative.translator.llvm.types.*
 import java.util.*
@@ -141,7 +142,7 @@ abstract class BlockCodegen(open val state: TranslationState, open val variableM
     }
 
     private fun evaluateThisExpression(): LLVMSingleValue? {
-        return variableManager.getLLVMValue("this")
+        return variableManager.get("this")
     }
 
     fun evaluateStringTemplateExpression(expr: KtStringTemplateExpression): LLVMSingleValue? {
@@ -173,7 +174,7 @@ abstract class BlockCodegen(open val state: TranslationState, open val variableM
         var receiver = when (receiverExpr) {
             is KtCallExpression,
             is KtBinaryExpression -> evaluateExpression(receiverExpr, scopeDepth) as LLVMVariable
-            else -> variableManager.getLLVMValue(receiverName)
+            else -> variableManager.get(receiverName)
         }
 
         if (receiver != null) {
@@ -223,7 +224,7 @@ abstract class BlockCodegen(open val state: TranslationState, open val variableM
         val field = classScope!!.companionFieldsIndex[fieldName]
         val companionObject = classScope.companionFieldsSource[fieldName]
 
-        val receiver = variableManager.getLLVMValue(companionObject!!.fullName)!!
+        val receiver = variableManager.get(companionObject!!.fullName)!!
 
         val result = codeBuilder.getNewVariable(field!!.type, pointer = 1)
         codeBuilder.loadClassField(result, receiver, field.offset)
@@ -280,10 +281,24 @@ abstract class BlockCodegen(open val state: TranslationState, open val variableM
         return indexVariable
     }
 
-    private fun evaluateReferenceExpression(expr: KtReferenceExpression, scopeDepth: Int, classScope: ClassCodegen? = null): LLVMSingleValue? = when (expr) {
-        is KtArrayAccessExpression -> evaluateArrayAccessExpression(expr, scopeDepth + 1)
-        else -> if ((expr is KtNameReferenceExpression) && (classScope != null)) evaluateNameReferenceExpression(expr, classScope)
-        else variableManager.getLLVMValue(expr.firstChild.text)
+    private fun evaluateReferenceExpression(expr: KtReferenceExpression, scopeDepth: Int, classScope: ClassCodegen? = null): LLVMSingleValue? = when {
+        expr is KtArrayAccessExpression -> evaluateArrayAccessExpression(expr, scopeDepth + 1)
+        isEnumClassField(expr) -> resolveEnumClassField(expr)
+        (expr is KtNameReferenceExpression) && (classScope != null) -> evaluateNameReferenceExpression(expr, classScope)
+        else -> variableManager.get(expr.firstChild.text)
+    }
+
+    @OptIn(IDEAPluginsCompatibilityAPI::class)
+    private fun resolveEnumClassField(expr: KtReferenceExpression): LLVMSingleValue {
+        val field = state.classes[expr.getType(state.bindingContext!!).toString()]!!.enumFields[expr.text]!!
+        return codeBuilder.loadAndGetVariable(codeBuilder.loadAndGetVariable(field))
+    }
+
+    @OptIn(IDEAPluginsCompatibilityAPI::class)
+    private fun isEnumClassField(expr: KtReferenceExpression): Boolean {
+        val name = expr.getType(state.bindingContext!!)?.toString() ?: return false
+        val clazz = state.classes[name] ?: return false
+        return clazz.enumFields.containsKey(expr.text)
     }
 
     private fun evaluateCallExpression(expr: KtCallExpression, scopeDepth: Int, classScope: ClassCodegen? = null): LLVMSingleValue? {
@@ -306,7 +321,7 @@ abstract class BlockCodegen(open val state: TranslationState, open val variableM
             return evaluateConstructorCallExpression(LLVMVariable(name, descriptor.type, scope = LLVMVariableScope()), args)
         }
 
-        val localFunction = variableManager.getLLVMValue(name)
+        val localFunction = variableManager.get(name)
         if (localFunction != null) {
             val type = localFunction.type as LLVMFunctionType
             val args = loadArgsIfRequired(names, type.arguments)
@@ -319,7 +334,7 @@ abstract class BlockCodegen(open val state: TranslationState, open val variableM
             if (classDescriptor.companionMethods.containsKey(methodShortName)) {
                 val descriptor = classDescriptor.companionMethods[methodShortName] ?: return null
                 val parentDescriptor = descriptor.parentCodegen!!
-                val receiver = variableManager.getLLVMValue(parentDescriptor.structName)!!
+                val receiver = variableManager.get(parentDescriptor.structName)!!
                 val methodFullName = descriptor.name
 
                 val returnType = descriptor.returnType!!.type
@@ -717,6 +732,9 @@ abstract class BlockCodegen(open val state: TranslationState, open val variableM
         val whenExpression = expr.subjectExpression
         val kotlinType = state.bindingContext?.get(BindingContext.EXPRESSION_TYPE_INFO, expr)!!.type!!
         val expressionType = LLVMInstanceOfStandardType("type", kotlinType, LLVMVariableScope()).type
+        if (state.classes.containsKey(kotlinType.toString())) {
+            (expressionType as LLVMReferenceType).prefix = "class"
+        }
 
         val targetExpression = evaluateExpression(whenExpression, scopeDepth + 1)!!
 

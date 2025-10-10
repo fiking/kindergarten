@@ -5,9 +5,11 @@ import org.jetbrains.kotlin.descriptors.ClassDescriptor
 import org.jetbrains.kotlin.psi.KtClass
 import org.jetbrains.kotlin.psi.KtClassOrObject
 import org.jetbrains.kotlin.psi.KtDeclaration
+import org.jetbrains.kotlin.psi.KtEnumEntry
 import org.jetbrains.kotlin.psi.KtNamedDeclaration
 import org.jetbrains.kotlin.psi.KtNamedFunction
 import org.jetbrains.kotlin.psi.KtProperty
+import org.jetbrains.kotlin.psi.KtSuperTypeCallEntry
 import org.jetbrains.kotlin.resolve.BindingContext
 import org.jetbrains.kotlin.types.KotlinType
 import org.kotlinnative.translator.llvm.LLVMBuilder
@@ -16,6 +18,7 @@ import org.kotlinnative.translator.llvm.LLVMFunctionDescriptor
 import org.kotlinnative.translator.llvm.LLVMInstanceOfStandardType
 import org.kotlinnative.translator.llvm.LLVMRegisterScope
 import org.kotlinnative.translator.llvm.LLVMVariable
+import org.kotlinnative.translator.llvm.LLVMVariableScope
 import org.kotlinnative.translator.llvm.types.LLVMByteType
 import org.kotlinnative.translator.llvm.types.LLVMReferenceType
 import org.kotlinnative.translator.llvm.types.LLVMVoidType
@@ -33,6 +36,7 @@ abstract class StructCodegen(open val state: TranslationState,
     val companionFields = ArrayList<LLVMVariable>()
     val companionFieldsIndex = HashMap<String, LLVMClassVariable>()
     val companionFieldsSource = HashMap<String, ObjectCodegen>()
+    val enumFields = HashMap<String, LLVMVariable>()
     val constructorFields = ArrayList<LLVMVariable>()
     abstract val type: LLVMReferenceType
     abstract var size: Int
@@ -44,6 +48,7 @@ abstract class StructCodegen(open val state: TranslationState,
 
     fun generate(declarations: List<KtDeclaration>) {
         generateStruct()
+        generateEnumFields()
         generatePrimaryConstructor()
 
         for (declaration in declarations) {
@@ -77,6 +82,11 @@ abstract class StructCodegen(open val state: TranslationState,
                     fieldsIndex[field.label] = field
                     size += field.type.size
                 }
+                is KtEnumEntry -> {
+                    val name = declaration.name!!
+                    val field = LLVMVariable("class.$fullName.$name", type, scope = LLVMVariableScope(), pointer = 2)
+                    enumFields.put(name, field)
+                }
                 is KtClass -> {
                     nestedClasses.put(declaration.name!!,
                         ClassCodegen(state,
@@ -85,6 +95,22 @@ abstract class StructCodegen(open val state: TranslationState,
                             this))
                 }
             }
+        }
+    }
+
+    private fun generateEnumFields() {
+        val enumEntries = classOrObject.declarations.filter { it is KtEnumEntry }
+
+        for (declaration in enumEntries) {
+            val name = declaration.name!!
+            val initializer = (declaration as KtEnumEntry).initializerList!!.initializers[0]
+            val arguments = (initializer as KtSuperTypeCallEntry).valueArguments.map { it.getArgumentExpression()!!.text }
+
+            val field = codeBuilder.getNewVariable(type, scope = LLVMVariableScope())
+            val enumField = enumFields[name]!!
+
+            codeBuilder.defineGlobalVariable(field, codeBuilder.makeStructInitializer(constructorFields, arguments))
+            codeBuilder.defineGlobalVariable(LLVMVariable(enumField.label, enumField.type, enumField.kotlinName, enumField.scope, enumField.pointer - 1), "$field")
         }
     }
 

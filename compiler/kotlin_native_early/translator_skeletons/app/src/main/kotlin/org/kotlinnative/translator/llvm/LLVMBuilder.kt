@@ -1,12 +1,7 @@
 package org.kotlinnative.translator.llvm
 
-import com.intellij.psi.tree.IElementType
-import org.jetbrains.kotlin.lexer.KtTokens
-import org.jetbrains.kotlin.psi.KtSimpleNameExpression
 import org.kotlinnative.translator.llvm.types.LLVMByteType
 import org.kotlinnative.translator.llvm.types.LLVMIntType
-import org.kotlinnative.translator.llvm.types.LLVMNullType
-import org.kotlinnative.translator.llvm.types.LLVMReferenceType
 import org.kotlinnative.translator.llvm.types.LLVMStringType
 import org.kotlinnative.translator.llvm.types.LLVMType
 
@@ -31,9 +26,9 @@ class LLVMBuilder(val arm: Boolean) {
         }
     }
 
-    fun getNewVariable(type: LLVMType, pointer: Int = 0, kotlinName: String? = null): LLVMVariable {
+    fun getNewVariable(type: LLVMType, pointer: Int = 0, kotlinName: String? = null, scope: LLVMScope = LLVMRegisterScope()): LLVMVariable {
         variableCount++
-        return LLVMVariable("%var$variableCount", type, kotlinName, LLVMRegisterScope(), pointer)
+        return LLVMVariable("%var$variableCount", type, kotlinName, scope, pointer)
     }
 
     fun getNewLabel(scope: LLVMScope = LLVMRegisterScope(), prefix: String) : LLVMLabel {
@@ -176,9 +171,12 @@ class LLVMBuilder(val arm: Boolean) {
         localCode.appendLine("br label $label")
     }
 
-    fun declareGlobalVariable(variable: LLVMVariable, defaultValue: String = variable.type.defaultValue) {
+    fun defineGlobalVariable(variable: LLVMVariable, defaultValue: String = variable.type.defaultValue) {
         localCode.appendLine("$variable = global ${variable.type} $defaultValue, align ${variable.type.align}")
     }
+
+    fun makeStructInitializer(args: List<LLVMVariable>, values: List<String>)
+            = "{ ${ args.mapIndexed { i: Int, variable: LLVMVariable -> "${variable.type} ${values[i]}" }.joinToString() } }"
 
     fun addStringConstant(variable: LLVMVariable, value: String) {
         val type = variable.type as LLVMStringType

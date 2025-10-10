@@ -8,7 +8,6 @@ import org.jetbrains.kotlin.resolve.BindingContext
 import org.kotlinnative.translator.exceptions.TranslationException
 import org.kotlinnative.translator.llvm.LLVMBuilder
 import org.kotlinnative.translator.llvm.LLVMClassVariable
-import org.kotlinnative.translator.llvm.types.LLVMEnumItemType
 import org.kotlinnative.translator.llvm.types.LLVMReferenceType
 import org.kotlinnative.translator.llvm.types.LLVMType
 
@@ -19,6 +18,7 @@ class ClassCodegen(override val state: TranslationState,
                    parentCodegen: StructCodegen? = null) :
     StructCodegen(state, variableManager, clazz, state.bindingContext?.get(BindingContext.CLASS, clazz) ?: throw TranslationException(), codeBuilder, parentCodegen) {
     val annotation: Boolean
+    val enum: Boolean
 
     override var size: Int = 0
     override var structName: String = clazz.name!!
@@ -28,7 +28,9 @@ class ClassCodegen(override val state: TranslationState,
         val descriptor = state.bindingContext?.get(BindingContext.CLASS, clazz) //?: throw TranslationException()
         val parameterList = clazz.getPrimaryConstructorParameterList()?.parameters ?: listOf()
         annotation = descriptor?.kind == ClassKind.ANNOTATION_CLASS
-        indexFields(descriptor, parameterList)
+        enum = descriptor?.kind == ClassKind.ENUM_CLASS
+
+        indexFields(parameterList)
         generateInnerFields(clazz.declarations)
 
         if (parentCodegen != null) {
@@ -38,7 +40,7 @@ class ClassCodegen(override val state: TranslationState,
         type.size = size
     }
 
-    private fun indexFields(descriptor: ClassDescriptor?, parameters: List<KtParameter>) {
+    private fun indexFields(parameters: List<KtParameter>) {
         if (annotation) {
             return
         }
@@ -51,19 +53,6 @@ class ClassCodegen(override val state: TranslationState,
             fields.add(item)
             fieldsIndex[item.label] = item
             size += type.size
-        }
-
-
-        when (descriptor?.kind) {
-            ClassKind.ENUM_CLASS -> {
-                val item = LLVMClassVariable("enum_item", LLVMEnumItemType())
-                item.offset = fields.size
-                fields.add(item)
-                fieldsIndex["enum_item"] = item
-                size += type.size
-            }
-            else -> {
-            }
         }
     }
     fun generate() {

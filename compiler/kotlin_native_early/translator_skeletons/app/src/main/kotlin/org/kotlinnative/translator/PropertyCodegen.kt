@@ -25,7 +25,7 @@ class PropertyCodegen(val state: TranslationState, val variableManager: Variable
                 pointer = 1
             )
             variableManager.addGlobalVariable(property.name.toString(), variable)
-            codeBuilder.declareGlobalVariable(variable, variableType.parseArg(value.toString()))
+            codeBuilder.defineGlobalVariable(variable, variableType.parseArg(value.toString()))
         }
     }
 
