@@ -196,7 +196,7 @@ class LLVMBuilder(val arm: Boolean = false) {
         localCode.appendLine(code)
     }
 
-    fun addGlobalIntialize(target: LLVMVariable, classType: LLVMType) {
+    fun addGlobalInitialize(target: LLVMVariable, classType: LLVMType) {
         val code = "$target = internal global $classType zeroinitializer, align ${classType.align}"
         globalCode.appendLine(code)
     }

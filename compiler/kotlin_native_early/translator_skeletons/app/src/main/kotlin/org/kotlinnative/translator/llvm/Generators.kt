@@ -16,6 +16,7 @@ import org.kotlinnative.translator.llvm.types.LLVMLongType
 import org.kotlinnative.translator.llvm.types.LLVMNullType
 import org.kotlinnative.translator.llvm.types.LLVMReferenceType
 import org.kotlinnative.translator.llvm.types.LLVMShortType
+import org.kotlinnative.translator.llvm.types.LLVMStringType
 import org.kotlinnative.translator.llvm.types.LLVMType
 import org.kotlinnative.translator.llvm.types.LLVMVoidType
 
@@ -44,6 +45,7 @@ fun LLVMInstanceOfStandardType(name: String, type: KotlinType?, scope: LLVMScope
         type.toString() == "Long" -> LLVMVariable(name, LLVMLongType(), name, scope)
         type.toString() == "Float" -> LLVMVariable(name, LLVMFloatType(), name, scope)
         type.toString() == "Double" -> LLVMVariable(name, LLVMDoubleType(), name, scope)
+        type.toString() == "String" -> LLVMVariable(name, LLVMStringType(0), name, scope)
         type.nameIfStandardType.toString() == "Nothing" -> LLVMVariable(name,
             LLVMNullType(), name, scope)
         type.isUnit() -> LLVMVariable("", LLVMVoidType(), "", scope)

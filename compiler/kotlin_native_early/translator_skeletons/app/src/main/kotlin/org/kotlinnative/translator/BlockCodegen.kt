@@ -9,6 +9,7 @@ import org.jetbrains.kotlin.descriptors.impl.PropertyDescriptorImpl
 import org.jetbrains.kotlin.lexer.KtTokens
 import org.jetbrains.kotlin.psi.*
 import org.jetbrains.kotlin.psi.psiUtil.getNextSiblingIgnoringWhitespaceAndComments
+import org.jetbrains.kotlin.psi.psiUtil.getQualifiedExpressionForReceiver
 import org.jetbrains.kotlin.psi.psiUtil.siblings
 import org.jetbrains.kotlin.resolve.BindingContext
 import org.jetbrains.kotlin.resolve.calls.callUtil.getType
@@ -211,10 +212,15 @@ abstract class BlockCodegen(val state: TranslationState, val variableManager: Va
             }
         }
 
-        val location = receiverExpr.getType(state.bindingContext!!)?.getSubtypesPredicate()?.toString()?.split(".")
-        val classReference = LLVMReferenceType(location?.last() ?: receiverName, "class")
-        if (location != null) {
-            classReference.location.addAll(location.dropLast(1))
+        val type = state.bindingContext?.get(BindingContext.EXPRESSION_TYPE_INFO, receiverExpr)?.type
+            ?: receiverExpr.getType(state.bindingContext!!)
+            ?: receiverExpr.getQualifiedExpressionForReceiver()?.getType(state.bindingContext)
+
+        val path = type?.getSubtypesPredicate()?.toString()?.split(".")
+        val classReference = LLVMReferenceType(path?.last() ?: receiverName, "class")
+
+        if (path != null) {
+            classReference.location.addAll(path.dropLast(1))
         }
 
         val clazz = resolveClassOrObjectLocation(classReference) ?: return evaluateExtensionExpression(receiverExpr, selectorExpr as KtCallExpression, scopeDepth)
@@ -276,14 +282,13 @@ abstract class BlockCodegen(val state: TranslationState, val variableManager: Va
         else -> throw UnsupportedOperationException()
     }
 
-    private fun evaluateNameReferenceExpression(expr: KtNameReferenceExpression, classScope: StructCodegen? = null): LLVMSingleValue? {
+    private fun evaluateNameReferenceExpression(expr: KtNameReferenceExpression, classScope: StructCodegen): LLVMSingleValue? {
         val fieldName = state.bindingContext?.get(BindingContext.REFERENCE_TARGET, expr)!!.name.toString()
-        val field = classScope!!.companionFieldsIndex[fieldName]
+        val field = classScope.companionFieldsIndex[fieldName]
         val companionObject = classScope.companionFieldsSource[fieldName]
-
         val receiver = variableManager[companionObject!!.fullName]!!
-
         val result = codeBuilder.getNewVariable(field!!.type, pointer = 1)
+
         codeBuilder.loadClassField(result, receiver, field.offset)
         return result
     }
@@ -382,14 +387,24 @@ abstract class BlockCodegen(val state: TranslationState, val variableManager: Va
     private fun evaluateReferenceExpression(expr: KtReferenceExpression, scopeDepth: Int, classScope: StructCodegen? = null): LLVMSingleValue? = when {
         expr is KtArrayAccessExpression -> evaluateArrayAccessExpression(expr, scopeDepth + 1)
         isEnumClassField(expr) -> resolveEnumClassField(expr)
-        (expr is KtNameReferenceExpression) && (classScope != null) -> evaluateNameReferenceExpression(expr, classScope.parentCodegen)
+        (expr is KtNameReferenceExpression) && (classScope != null) -> evaluateNameReferenceExpression(expr, classScope.parentCodegen!!)
         resolveContainingClass(expr) != null -> evaluateMemberMethodOrField(variableManager["this"]!!, expr.firstChild.text, topLevel)
         else -> variableManager[expr.firstChild.text]
     }
 
-    @OptIn(IDEAPluginsCompatibilityAPI::class)
     private fun resolveEnumClassField(expr: KtReferenceExpression): LLVMSingleValue {
-        return state.classes[expr.getType(state.bindingContext!!).toString()]!!.enumFields[expr.text]!!
+        return resolveCodegen(expr)!!.enumFields[expr.text]!!
+    }
+
+    @OptIn(IDEAPluginsCompatibilityAPI::class)
+    private fun  resolveCodegen(expr: KtReferenceExpression): StructCodegen? {
+        val location = expr.getType(state.bindingContext!!)?.getSubtypesPredicate()?.toString()?.split(".") ?: return null
+        val name = location.last()
+
+        val classType = LLVMReferenceType(name, prefix = "class")
+        classType.location.addAll(location.dropLast(1))
+
+        return resolveClassOrObjectLocation(classType)
     }
 
     @OptIn(IDEAPluginsCompatibilityAPI::class)
@@ -571,15 +586,19 @@ abstract class BlockCodegen(val state: TranslationState, val variableManager: Va
         if (operator == KtTokens.ELVIS) {
             return evaluateElvisOperator(expr, scopeDepth)
         }
-        val left = evaluateExpression(expr.firstChild, scopeDepth)
-        if (expr.firstChild is KtArrayAccessExpression) {
-            return null
-        } else {
-            left ?: throw UnsupportedOperationException("Wrong binary exception: ${expr.text}")
+
+        val left = evaluateExpression(expr.left, scopeDepth)
+        if (expr.left is KtArrayAccessExpression) {
+            val callMaker = state.bindingContext?.get(BindingContext.CALL, expr.left)
+            if (callMaker!!.callType == Call.CallType.ARRAY_SET_METHOD) {
+                return left as LLVMVariable?
+            }
         }
 
-        val right = evaluateExpression(expr.lastChild, scopeDepth) ?: throw UnsupportedOperationException("Wrong binary exception: ${expr.text}")
+        left ?: throw UnsupportedOperationException("Wrong binary exception: ${expr.text}")
 
+
+        val right = evaluateExpression(expr.right, scopeDepth) ?: throw UnsupportedOperationException("Wrong binary exception: ${expr.text}")
         return executeBinaryExpression(operator, expr.operationReference, left, right)
     }
 
@@ -766,7 +785,7 @@ abstract class BlockCodegen(val state: TranslationState, val variableManager: Va
 
         when (assignExpression) {
             is LLVMVariable -> {
-                if (assignExpression.pointer == 0) {
+                if (assignExpression.pointer < 2) {
                     val allocVar = variableManager.receiveVariable(identifier, assignExpression.type, LLVMRegisterScope(), pointer = 0)
                     codeBuilder.allocStackVar(allocVar)
                     allocVar.pointer++

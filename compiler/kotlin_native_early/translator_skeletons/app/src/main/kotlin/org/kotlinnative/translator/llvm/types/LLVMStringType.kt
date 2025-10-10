@@ -10,4 +10,10 @@ class LLVMStringType(override val length: Int) : LLVMArray, LLVMType() {
     override fun basicType() = LLVMByteType()
     override fun toString(): String = "i8*"
     override fun fullType() = "[${length + 1} x i8]"
+
+    override fun equals(other: Any?): Boolean =
+        when (other) {
+            is LLVMStringType -> this.length == other.length
+            else -> false
+        }
 }
