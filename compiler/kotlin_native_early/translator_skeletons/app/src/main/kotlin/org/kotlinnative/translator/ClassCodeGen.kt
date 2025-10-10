@@ -21,8 +21,8 @@ class ClassCodegen(override val state: TranslationState,
     val annotation: Boolean
 
     override var size: Int = 0
-    override var structName: String = clazz.name!!
-    override val type: LLVMReferenceType = LLVMReferenceType(clazz.name.toString(), "class", byRef = true)
+    override var structName: String = (if (parentCodegen != null) parentCodegen.structName + "." else "") + clazz.name!!
+    override val type: LLVMReferenceType = LLVMReferenceType(structName, "class", byRef = true)
 
     init {
         val descriptor = state.bindingContext?.get(BindingContext.CLASS, clazz) //?: throw TranslationException()
@@ -70,5 +70,19 @@ class ClassCodegen(override val state: TranslationState,
         if (annotation) return
         generate(clazz.declarations)
         nestedClasses.forEach { x, classCodegen -> classCodegen.generate() }
+
+        val descriptor = state.bindingContext?.get(BindingContext.CLASS, clazz) ?: throw TranslationException()
+        val companionObjectDescriptor = descriptor.companionObjectDescriptor
+        if (companionObjectDescriptor != null) {
+            val companionObject = clazz.getCompanionObjects().first()
+            val property = ObjectCodegen(state, variableManager, companionObject, codeBuilder, this)
+            val companionObjectName = structName + "." + companionObject.name
+            property.generate()
+
+            for (method in property.methods) {
+                val methodName = method.key.removePrefix("$companionObjectName.")
+                companionMethods.put("$structName.$methodName", method.value)
+            }
+        }
     }
 }

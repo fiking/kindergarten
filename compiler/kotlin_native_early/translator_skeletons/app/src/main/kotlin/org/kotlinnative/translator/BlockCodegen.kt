@@ -180,6 +180,27 @@ abstract class BlockCodegen(open val state: TranslationState, open val variableM
             return evaluateFunctionCallExpression(LLVMVariable(function, type.returnType.type, scope = LLVMRegisterScope()), args)
         }
 
+        if (state.classes.containsKey(classScope?.structName)) {
+            val classDescriptor = state.classes[classScope?.structName] ?: return null
+            val methodShortName = classScope?.structName + "." + function
+            if (classDescriptor.companionMethods.containsKey(methodShortName)) {
+                val descriptor = classDescriptor.companionMethods[methodShortName] ?: return null
+                val parentDescriptor = descriptor.parentCodegen!!
+                val receiver = variableManager.getLLVMValue(parentDescriptor.structName)!!
+                val methodFullName = descriptor.name
+
+                val returnType = descriptor.returnType!!.type
+
+                val loadedArgs = loadArgsIfRequired(names, descriptor.args)
+                val callArgs = mutableListOf<LLVMSingleValue>(receiver)
+                callArgs.addAll(loadedArgs)
+
+                return evaluateFunctionCallExpression(LLVMVariable(methodFullName, returnType, scope = LLVMVariableScope()), callArgs)
+
+            }
+
+        }
+
         val nestedConstructor = classScope?.nestedClasses?.get(expr.calleeExpression!!.text)
         if (nestedConstructor != null) {
             val args = loadArgsIfRequired(names, nestedConstructor.constructorFields)
