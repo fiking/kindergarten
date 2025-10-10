@@ -25,7 +25,7 @@ abstract class StructCodegen(open val state: TranslationState,
                              open val classOrObject: KtClassOrObject,
                              val classDescriptor: ClassDescriptor,
                              open val codeBuilder: LLVMBuilder,
-                             val prefix: String = "") {
+                             val owner: StructCodegen? = null) {
     val fields = ArrayList<LLVMVariable>()
     val fieldsIndex = HashMap<String, LLVMClassVariable>()
     val nestedClasses = HashMap<String, ClassCodegen>()
@@ -35,7 +35,7 @@ abstract class StructCodegen(open val state: TranslationState,
     var methods = HashMap<String, FunctionCodegen>()
     abstract var structName: String
     val fullName: String
-        get() = "${if (prefix.isNotEmpty()) "${prefix}_" else ""}$structName"
+        get() = "${if (type.location.size > 0) "${type.location.joinToString(".")}." else ""}$structName"
 
 
     fun generate(declarations: List<KtDeclaration>) {
@@ -78,7 +78,7 @@ abstract class StructCodegen(open val state: TranslationState,
                         ClassCodegen(state,
                             VariableManager(state.globalVariableCollection),
                             declaration, codeBuilder,
-                            fullName))
+                            this))
                 }
             }
         }

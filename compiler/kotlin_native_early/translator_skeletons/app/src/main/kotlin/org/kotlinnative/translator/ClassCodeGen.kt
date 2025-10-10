@@ -16,8 +16,8 @@ class ClassCodegen(override val state: TranslationState,
                    override val variableManager: VariableManager,
                    val clazz: KtClass,
                    override val codeBuilder: LLVMBuilder,
-                   prefix: String = "") :
-    StructCodegen(state, variableManager, clazz, state.bindingContext?.get(BindingContext.CLASS, clazz) ?: throw TranslationException(), codeBuilder, prefix) {
+                   owner: StructCodegen? = null) :
+    StructCodegen(state, variableManager, clazz, state.bindingContext?.get(BindingContext.CLASS, clazz) ?: throw TranslationException(), codeBuilder, owner) {
     val annotation: Boolean
 
     override var size: Int = 0
@@ -31,8 +31,9 @@ class ClassCodegen(override val state: TranslationState,
         indexFields(descriptor, parameterList)
         generateInnerFields(clazz.declarations)
 
-        if (prefix.length > 0) {
-            type.prefix = "${type.prefix}_$prefix"
+        if (owner != null) {
+            type.location.addAll(owner.type.location)
+            type.location.add(owner.structName)
         }
         type.size = size
     }
@@ -61,7 +62,8 @@ class ClassCodegen(override val state: TranslationState,
                 fieldsIndex["enum_item"] = item
                 size += type.size
             }
-            else -> null
+            else -> {
+            }
         }
     }
     fun generate() {
