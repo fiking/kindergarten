@@ -168,7 +168,7 @@ abstract class BlockCodegen(val state: TranslationState, val variableManager: Va
         val receiveValue = state.bindingContext?.get(BindingContext.COMPILE_TIME_VALUE, expr)
         val type = (receiveValue as TypedCompileTimeConstant).type
         val value = receiveValue.getValue(type) ?: return null
-        val variable = variableManager.receiveVariable(".str", LLVMStringType(value.toString().length, isLoaded = false), LLVMVariableScope(), pointer = 0)
+        val variable = variableManager.receiveVariable(".str" + LLVMBuilder.UniqueGenerator.generateUniqueString(), LLVMStringType(value.toString().length, isLoaded = false), LLVMVariableScope(), pointer = 0)
 
         codeBuilder.addStringConstant(variable, value.toString())
         return variable
@@ -1066,6 +1066,7 @@ abstract class BlockCodegen(val state: TranslationState, val variableManager: Va
             "or" -> firstNativeOp.type!!.operatorOr(firstNativeOp, secondNativeOp)
             "xor" -> firstNativeOp.type!!.operatorXor(firstNativeOp, secondNativeOp)
             "and" -> firstNativeOp.type!!.operatorAnd(firstNativeOp, secondNativeOp)
+            "%" -> firstNativeOp.type!!.operatorMod(firstNativeOp, secondNativeOp)
             "shl" -> {
                 var secondNativeOpWithRequiredType = secondNativeOp
                 if (firstNativeOp.type != secondNativeOp.type) {
@@ -1110,6 +1111,13 @@ abstract class BlockCodegen(val state: TranslationState, val variableManager: Va
             }
             "*=" -> {
                 val llvmExpression = firstNativeOp.type!!.operatorTimes(firstNativeOp, secondNativeOp)
+                val resultOp = codeBuilder.getNewVariable(llvmExpression.variableType)
+                codeBuilder.addAssignment(resultOp, llvmExpression)
+                codeBuilder.storeVariable(firstOp, resultOp)
+                return LLVMExpression(resultOp.type, "load ${firstOp.getType()} $firstOp, align ${firstOp.type!!.align}")
+            }
+            "%=" -> {
+                val llvmExpression = firstNativeOp.type!!.operatorMod(firstNativeOp, secondNativeOp)
                 val resultOp = codeBuilder.getNewVariable(llvmExpression.variableType)
                 codeBuilder.addAssignment(resultOp, llvmExpression)
                 codeBuilder.storeVariable(firstOp, resultOp)

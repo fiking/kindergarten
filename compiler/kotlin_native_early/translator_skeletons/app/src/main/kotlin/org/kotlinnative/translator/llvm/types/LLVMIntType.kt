@@ -71,6 +71,9 @@ class LLVMIntType() : LLVMType() {
     override fun operatorDec(firstOp: LLVMSingleValue): LLVMExpression =
         LLVMExpression(LLVMIntType(), "sub nsw i32 $firstOp, 1")
 
+    override fun operatorMod(firstOp: LLVMSingleValue, secondOp: LLVMSingleValue): LLVMExpression =
+        LLVMExpression(LLVMIntType(), "srem i32 $firstOp, $secondOp")
+
     override fun convertFrom(source: LLVMSingleValue): LLVMExpression = when (source.type!!) {
         is LLVMBooleanType,
         is LLVMByteType,
