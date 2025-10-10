@@ -8,4 +8,5 @@ class LLVMEnumItemType() : LLVMType() {
     override val defaultValue = "0"
 
     override fun toString() = "i32"
+    override fun mangle() = "Enum"
 }

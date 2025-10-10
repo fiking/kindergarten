@@ -10,6 +10,7 @@ class LLVMDoubleType() : LLVMType() {
     override var size: Int = 8
     override val defaultValue = "0.0"
     override fun isPrimitive() = true
+    override fun mangle() = "Double"
 
     override fun operatorPlus(
         firstOp: LLVMSingleValue,

@@ -22,4 +22,5 @@ class LLVMFloatType() : LLVMType() {
     override fun toString() = "float"
     override val defaultValue = "0.0"
     override fun isPrimitive() = true
+    override fun mangle() = "Float"
 }

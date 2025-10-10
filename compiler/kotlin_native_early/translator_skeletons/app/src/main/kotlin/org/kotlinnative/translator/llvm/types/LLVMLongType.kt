@@ -60,4 +60,5 @@ class LLVMLongType() : LLVMType() {
 
     override fun toString() = "i64"
     override fun isPrimitive() = true
+    override fun mangle() = "Long"
 }

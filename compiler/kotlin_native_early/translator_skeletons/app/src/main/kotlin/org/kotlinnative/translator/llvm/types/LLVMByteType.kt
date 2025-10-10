@@ -10,6 +10,7 @@ class LLVMByteType() : LLVMType() {
     override var size: Int = 1
     override val defaultValue = "0"
     override fun isPrimitive() = true
+    override fun mangle() = "Byte"
 
     override fun operatorLt(firstOp: LLVMSingleValue, secondOp: LLVMSingleValue): LLVMExpression =
         LLVMExpression(LLVMIntType(), "icmp slt i8 $firstOp, $secondOp")

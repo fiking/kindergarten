@@ -10,6 +10,7 @@ class LLVMIntType() : LLVMType() {
     override var size: Int = 4
     override val defaultValue = "0"
     override fun isPrimitive() = true
+    override fun mangle() = "Int"
 
     override fun operatorPlus(
         firstOp: LLVMSingleValue,

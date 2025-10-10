@@ -44,6 +44,7 @@ class LLVMBooleanType() : LLVMType() {
     override var size: Int = 1
     override val defaultValue = "0"
     override fun isPrimitive() = true
+    override fun mangle() = "Boolean"
 
     override fun toString() = "i1"
 }

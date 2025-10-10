@@ -10,6 +10,7 @@ class LLVMReferenceType(val type: String, var prefix: String = "", override val 
 
     override var size: Int = 4
     override val defaultValue = ""
+    override fun mangle() = "Ref_$type"
 
     private val params = ArrayList<String>()
     val location = ArrayList<String>()

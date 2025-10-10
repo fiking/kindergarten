@@ -28,6 +28,7 @@ class TranslationState(
     val bindingContext: BindingContext?,
     val arm: Boolean
 ) {
+    var externalFunctions = HashMap<String, FunctionCodegen>()
     var functions = HashMap<String, FunctionCodegen>()
     val globalVariableCollection = HashMap<String, LLVMVariable>()
     var classes = HashMap<String, ClassCodegen>()

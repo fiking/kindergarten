@@ -27,4 +27,5 @@ class LLVMCharType() : LLVMType() {
     override fun toString(): String = "i8"
     override val defaultValue = "0"
     override fun isPrimitive() = true
+    override fun mangle() = "Char"
 }
