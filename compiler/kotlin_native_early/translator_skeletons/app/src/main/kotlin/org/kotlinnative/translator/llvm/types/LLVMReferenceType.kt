@@ -25,5 +25,12 @@ class LLVMReferenceType(val type: String, var prefix: String = "", override val 
         LLVMExpression(LLVMBooleanType(), "icmp eq ${firstOp.getType()} $firstOp, ${if (secondOp.type is LLVMNullType) "null" else "$secondOp"}")
 
     override fun operatorNeq(firstOp: LLVMSingleValue, secondOp: LLVMSingleValue): LLVMExpression =
-        LLVMExpression(LLVMBooleanType(), "icmp neq ${firstOp.getType()} $firstOp, ${if (secondOp.type is LLVMNullType) "null" else "$secondOp"}")
+        LLVMExpression(LLVMBooleanType(), "icmp ne ${firstOp.getType()} $firstOp, ${if (secondOp.type is LLVMNullType) "null" else "$secondOp"}")
+
+    override fun equals(other: Any?): Boolean {
+        return (other is LLVMReferenceType) and (typename.equals((other as LLVMReferenceType).typename))
+    }
+
+    override fun hashCode() =
+        typename.hashCode()
 }

@@ -44,12 +44,8 @@ class LLVMFloatType() : LLVMType() {
     override fun equals(other: Any?): Boolean {
         return other is LLVMFloatType
     }
-    override fun hashCode(): Int {
-        var result = align
-        result = 31 * result + size
-        result = 31 * result + defaultValue.hashCode()
-        return result
-    }
+    override fun hashCode() =
+        typename.hashCode()
 
     override val align = 4
     override var size: Int = 4

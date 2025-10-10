@@ -379,9 +379,9 @@ abstract class BlockCodegen(val state: TranslationState, val variableManager: Va
     private fun evaluateNameReferenceExpression(expr: KtNameReferenceExpression, classScope: StructCodegen): LLVMSingleValue? {
         val fieldName = state.bindingContext?.get(BindingContext.REFERENCE_TARGET, expr)!!.name.toString()
         val companionObject = (classScope as ClassCodegen).companionObjectCodegen ?: throw UnexpectedException(expr.text)
-        val field = companionObject.fieldsIndex[fieldName]
+        val field = companionObject.fieldsIndex[fieldName] ?: throw UnexpectedException(expr.text)
         val receiver = variableManager[companionObject.fullName]!!
-        val result = codeBuilder.getNewVariable(field!!.type, pointer = 1)
+        val result = codeBuilder.getNewVariable(field.type, pointer = 1)
 
         codeBuilder.loadClassField(result, receiver, field.offset)
         return result
@@ -654,11 +654,14 @@ abstract class BlockCodegen(val state: TranslationState, val variableManager: Va
             KtTokens.LTEQ -> firstOp.type!!.operatorLeq(firstNativeOp, secondNativeOp)
             KtTokens.GTEQ -> firstOp.type!!.operatorGeq(firstNativeOp, secondNativeOp)
             KtTokens.EQEQ ->
-                if (firstOp.type is LLVMReferenceType)
+                if ((firstOp.type is LLVMReferenceType) && (secondOp.type !is LLVMReferenceType))
                     firstOp.type!!.operatorEq(firstNativeOp, secondOp)
                 else
                     firstOp.type!!.operatorEq(firstNativeOp, secondNativeOp)
+            KtTokens.EQEQEQ ->
+                firstOp.type!!.operatorEq(firstNativeOp, secondNativeOp)
             KtTokens.EXCLEQ -> firstOp.type!!.operatorNeq(firstNativeOp, secondNativeOp)
+            KtTokens.EXCLEQEQEQ -> firstOp.type!!.operatorNeq(firstNativeOp, secondNativeOp)
             KtTokens.EQ -> {
                 if (secondOp.type is LLVMNullType) {
                     val result = codeBuilder.getNewVariable(firstOp.type!!, firstOp.pointer)

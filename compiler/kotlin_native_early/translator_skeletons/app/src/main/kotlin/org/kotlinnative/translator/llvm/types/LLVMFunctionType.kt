@@ -26,4 +26,11 @@ class LLVMFunctionType(type: KotlinType) : LLVMType() {
         if (arguments.isNotEmpty()) "_${arguments.joinToString(separator = "_", transform = { it.type.mangle() })}" else ""
 
     override fun toString(): String = "${returnType.type} (${arguments.joinToString { it.getType() }})"
+
+    override fun hashCode() =
+        mangle().hashCode()
+
+    override fun equals(other: Any?): Boolean {
+        return (other is LLVMFunctionType) && (mangle() == other.mangle())
+    }
 }

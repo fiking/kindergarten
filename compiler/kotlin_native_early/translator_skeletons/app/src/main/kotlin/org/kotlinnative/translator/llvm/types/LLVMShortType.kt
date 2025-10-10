@@ -34,10 +34,6 @@ class LLVMShortType() : LLVMType() {
     override fun equals(other: Any?): Boolean {
         return other is LLVMShortType
     }
-    override fun hashCode(): Int{
-        var result = size
-        result = 31 * result + align
-        result = 31 * result + defaultValue.hashCode()
-        return result
-    }
+    override fun hashCode() =
+        mangle().hashCode()
 }

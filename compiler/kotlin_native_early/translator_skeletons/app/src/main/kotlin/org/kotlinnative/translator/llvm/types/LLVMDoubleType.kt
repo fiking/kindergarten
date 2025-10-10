@@ -55,10 +55,6 @@ class LLVMDoubleType() : LLVMType() {
     override fun equals(other: Any?): Boolean {
         return other is LLVMDoubleType
     }
-    override fun hashCode(): Int{
-        var result = align
-        result = 31 * result + size
-        result = 31 * result + defaultValue.hashCode()
-        return result
-    }
+    override fun hashCode() =
+        mangle().hashCode()
 }

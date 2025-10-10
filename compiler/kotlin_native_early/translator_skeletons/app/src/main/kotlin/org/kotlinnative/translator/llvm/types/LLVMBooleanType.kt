@@ -53,12 +53,8 @@ class LLVMBooleanType() : LLVMType() {
         return other is LLVMBooleanType
     }
 
-    override fun hashCode(): Int{
-        var result = align
-        result = 31 * result + size
-        result = 31 * result + defaultValue.hashCode()
-        return result
-    }
+    override fun hashCode() =
+        mangle().hashCode()
 
     override val align = 4
     override var size: Int = 1

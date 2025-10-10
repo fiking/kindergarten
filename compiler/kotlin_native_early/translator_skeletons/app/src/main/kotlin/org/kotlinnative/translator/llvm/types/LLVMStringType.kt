@@ -16,4 +16,9 @@ class LLVMStringType(override val length: Int) : LLVMArray, LLVMType() {
             is LLVMStringType -> this.length == other.length
             else -> false
         }
+
+    override fun hashCode(): Int {
+        return length * 31 +
+                mangle().hashCode()
+    }
 }
