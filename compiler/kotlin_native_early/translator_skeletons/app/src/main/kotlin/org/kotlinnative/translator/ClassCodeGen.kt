@@ -85,6 +85,9 @@ class ClassCodegen(override val state: TranslationState,
                 companionFieldsSource.put("$structName.$methodName", property)
             }
             companionFields.addAll(property.fields)
+            for (field in property.fields) {
+                companionFieldsSource.put(field.label, property)
+            }
             companionFieldsIndex.putAll(property.fieldsIndex)
         }
     }

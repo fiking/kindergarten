@@ -36,6 +36,6 @@ class ObjectCodegen(override val state: TranslationState,
             pointer = 1
         )
         codeBuilder.addGlobalIntialize(classInstance, type)
-        variableManager.addGlobalVariable(structName, classInstance)
+        variableManager.addGlobalVariable(fullName, classInstance)
     }
 }

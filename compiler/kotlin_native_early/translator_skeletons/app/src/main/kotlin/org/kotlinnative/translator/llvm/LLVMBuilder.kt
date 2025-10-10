@@ -67,7 +67,7 @@ class LLVMBuilder(val arm: Boolean) {
 
     fun addPrimitiveBinaryOperation(
         operator: IElementType,
-        referenceName: KtSimpleNameExpression,
+        referenceName: KtSimpleNameExpression?,
         firstOp: LLVMSingleValue,
         secondOp: LLVMSingleValue
     ): LLVMVariable {
@@ -81,7 +81,11 @@ class LLVMBuilder(val arm: Boolean) {
             KtTokens.GT -> firstOp.type!!.operatorGt(firstNativeOp, secondNativeOp)
             KtTokens.LTEQ -> firstOp.type!!.operatorLeq(firstNativeOp, secondNativeOp)
             KtTokens.GTEQ -> firstOp.type!!.operatorGeq(firstNativeOp, secondNativeOp)
-            KtTokens.EQEQ -> firstOp.type!!.operatorEq(firstNativeOp, secondNativeOp)
+            KtTokens.EQEQ ->
+                if (firstOp.type is LLVMReferenceType)
+                    firstOp.type!!.operatorEq(firstOp, secondOp)
+                else
+                    firstOp.type!!.operatorEq(firstNativeOp, secondNativeOp)
             KtTokens.EXCLEQ -> firstOp.type!!.operatorNeq(firstNativeOp, secondNativeOp)
             KtTokens.EQ -> {
                 if (secondOp.type is LLVMNullType) {
@@ -101,7 +105,7 @@ class LLVMBuilder(val arm: Boolean) {
                 storeVariable(result, secondNativeOp)
                 return result
             }
-            else -> addPrimitiveReferenceOperation(referenceName, firstNativeOp, secondNativeOp);
+            else -> addPrimitiveReferenceOperation(referenceName!!, firstNativeOp, secondNativeOp);
         }
 
         val resultOp = getNewVariable(llvmExpression.variableType)
@@ -261,5 +265,13 @@ class LLVMBuilder(val arm: Boolean) {
     fun storeNull(result: LLVMVariable) {
         val code = "store ${result.getType().dropLast(1)} null, ${result.getType()} $result, align $POINTER_SIZE"
         localCode.appendLine(code)
+    }
+
+    fun addComment(comment: String) {
+        localCode.appendLine("; " + comment)
+    }
+
+    fun allocStackVarInPointer(target: LLVMVariable) {
+        localCode.appendLine("$target = alloca ${target.type}, align ${target.type.align}")
     }
 }
