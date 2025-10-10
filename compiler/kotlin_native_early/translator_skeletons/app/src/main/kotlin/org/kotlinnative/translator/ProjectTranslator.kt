@@ -48,9 +48,9 @@ class ProjectTranslator(val files: List<KtFile>, val state: TranslationState) {
             properties.values.map { it.generate() }
             objects.values.map { it.generate() }
             classes.values.map { it.generate() }
+            externalFunctions.values.map { it.generate() }
             functions.values.filter { it.isExtensionDeclaration }.map { it.generate() }
             functions.values.filter { !it.isExtensionDeclaration }.map { it.generate() }
-            externalFunctions.values.map { it.generate() }
         }
     }
 
