@@ -62,4 +62,10 @@ class LLVMIntType() : LLVMType() {
 
     override fun operatorUshr(firstOp: LLVMSingleValue, secondOp: LLVMSingleValue): LLVMExpression =
         LLVMExpression(LLVMIntType(), "lshr i32 $firstOp, $secondOp")
+
+    override fun operatorInc(firstOp: LLVMSingleValue): LLVMExpression =
+        LLVMExpression(LLVMIntType(), "add nsw i32 $firstOp, 1")
+
+    override fun operatorDec(firstOp: LLVMSingleValue): LLVMExpression =
+        LLVMExpression(LLVMIntType(), "sub nsw i32 $firstOp, 1")
 }
