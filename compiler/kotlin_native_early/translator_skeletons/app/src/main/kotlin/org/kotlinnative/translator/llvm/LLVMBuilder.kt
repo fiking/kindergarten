@@ -136,7 +136,7 @@ class LLVMBuilder(val arm: Boolean) {
 
     fun createClass(name: String, fields: List<LLVMVariable>) {
         val code = "@class.$name = type { ${ fields.map { it.type }.joinToString() } }"
-        localCode.appendLine(code)
+        globalCode.appendLine(code)
     }
 
     fun allocStackVar(target: LLVMVariable) {
