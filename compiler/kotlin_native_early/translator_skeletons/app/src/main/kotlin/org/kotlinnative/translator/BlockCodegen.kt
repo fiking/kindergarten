@@ -24,9 +24,30 @@ abstract class BlockCodegen(open val state: TranslationState, open val variableM
     var wasReturnOnTopLevel = false
 
 
-    protected fun evaluateCodeBlock(expr: PsiElement?, startLabel: LLVMLabel? = null, finishLabel: LLVMLabel? = null, scopeDepth: Int = 0) {
+    protected fun evaluateCodeBlock(expr: PsiElement?, startLabel: LLVMLabel? = null, finishLabel: LLVMLabel? = null, scopeDepth: Int = 0, isBlock: Boolean = true) {
         codeBuilder.markWithLabel(startLabel)
-        expressionWalker(expr, scopeDepth)
+        if (isBlock) {
+            expressionWalker(expr, scopeDepth)
+        } else {
+
+            var result = evaluateExpression(expr, scopeDepth)!!
+            when (result) {
+                is LLVMVariable -> {
+                    if (result.pointer == 1 && result.type !is LLVMReferenceType) {
+                        result = codeBuilder.loadAndGetVariable(result)
+                    }
+
+                    if (result.type is LLVMReferenceType) {
+                        codeBuilder.addAnyReturn(LLVMVoidType())
+                    } else {
+                        codeBuilder.addReturnOperator(result)
+                    }
+                }
+                else -> codeBuilder.addAnyReturn(result.type!!, result.toString())
+            }
+
+            wasReturnOnTopLevel = true
+        }
         codeBuilder.addUnconditionalJump(finishLabel ?: return)
     }
 
@@ -168,7 +189,7 @@ abstract class BlockCodegen(open val state: TranslationState, open val variableM
 
         val names = parseArgList(call as KtCallExpression, scopeDepth)
         val typePath = type.location.joinToString(".")
-        val types = if (names.size > 0) "_${names.joinToString(separator = "_", transform ={ it.type!!.mangle() })}" else ""
+        val types = if (names.size > 0) "_${names.joinToString(separator = "_", transform = { it.type!!.mangle() })}" else ""
         val methodName = "${if (typePath.length > 0) "$typePath." else ""}${clazz.structName}.${selectorName.substringBefore('(')}$types"
 
         val method = clazz.methods[methodName]!!

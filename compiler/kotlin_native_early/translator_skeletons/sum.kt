@@ -1,7 +1,10 @@
-class MyClass(val a: Int)
+class MyClass(val a: Int) {
+  fun Add() {}
+}
 
-fun readClassField() : Int {
+fun readClassField() {
   var value = MyClass()
+  var rst = value.Add()
   return value.a
 }
 
