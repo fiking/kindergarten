@@ -115,7 +115,7 @@ abstract class BlockCodegen(val state: TranslationState, val variableManager: Va
 
         val left = evaluateExpression(receiver, scopeDepth)!!
         val loadedLeft = codeBuilder.receiveNativeValue(left)
-        val expectedType = LLVMMapStandardType(state.bindingContext?.get(BindingContext.EXPECTED_EXPRESSION_TYPE, expr)!!) as LLVMReferenceType
+        val expectedType = LLVMMapStandardType(state.bindingContext?.get(BindingContext.EXPECTED_EXPRESSION_TYPE, expr)!!, state) as LLVMReferenceType
 
         if (state.classes.containsKey(expectedType.type)) {
             expectedType.prefix = "class"
@@ -165,7 +165,7 @@ abstract class BlockCodegen(val state: TranslationState, val variableManager: Va
 
     private fun evaluateCallableReferenceExpression(expr: KtCallableReferenceExpression): LLVMSingleValue? {
         val kotlinType = state.bindingContext?.get(BindingContext.EXPRESSION_TYPE_INFO, expr)!!.type!!
-        val result = LLVMInstanceOfStandardType(expr.text.substring(2), kotlinType, LLVMVariableScope())
+        val result = LLVMInstanceOfStandardType(expr.text.substring(2), kotlinType, LLVMVariableScope(), state)
         return LLVMVariable("${result.label}${(result.type as LLVMFunctionType).mangleArgs()}", result.type, result.kotlinName, result.scope, result.pointer)
     }
 
@@ -245,7 +245,7 @@ abstract class BlockCodegen(val state: TranslationState, val variableManager: Va
 
     private fun evaluateExtensionExpression(receiver: KtExpression, selector: KtCallExpression, scopeDepth: Int): LLVMSingleValue? {
         val receiverType = state.bindingContext?.get(BindingContext.EXPRESSION_TYPE_INFO, receiver)
-        val standardType = LLVMMapStandardType(receiverType!!.type!!)
+        val standardType = LLVMMapStandardType(receiverType!!.type!!, state)
         val function = selector.firstChild.firstChild.text
         val names = parseArgList(selector, scopeDepth)
         val type = if (names.size > 0) "_${names.joinToString(separator = "_", transform = { it.type!!.mangle() })}" else ""
@@ -654,14 +654,36 @@ abstract class BlockCodegen(val state: TranslationState, val variableManager: Va
             KtTokens.LTEQ -> firstOp.type!!.operatorLeq(firstNativeOp, secondNativeOp)
             KtTokens.GTEQ -> firstOp.type!!.operatorGeq(firstNativeOp, secondNativeOp)
             KtTokens.EQEQ ->
-                if ((firstOp.type is LLVMReferenceType) && (secondOp.type !is LLVMReferenceType))
-                    firstOp.type!!.operatorEq(firstNativeOp, secondOp)
+                if (firstOp.type is LLVMReferenceType)
+                    if (secondOp.type is LLVMReferenceType) {
+                        val firstPointedArgument = receivePointedArgument(firstOp, 1)
+                        val secondPointedArgument = receivePointedArgument(secondOp, 1)
+                        firstOp.type!!.operatorEq(firstPointedArgument, secondPointedArgument)
+                    } else
+                        firstOp.type!!.operatorEq(firstNativeOp, secondOp)
                 else
                     firstOp.type!!.operatorEq(firstNativeOp, secondNativeOp)
-            KtTokens.EQEQEQ ->
-                firstOp.type!!.operatorEq(firstNativeOp, secondNativeOp)
-            KtTokens.EXCLEQ -> firstOp.type!!.operatorNeq(firstNativeOp, secondNativeOp)
-            KtTokens.EXCLEQEQEQ -> firstOp.type!!.operatorNeq(firstNativeOp, secondNativeOp)
+            KtTokens.EQEQEQ -> {
+                val firstPointedArgument = receivePointedArgument(firstOp, 1)
+                val secondPointedArgument = receivePointedArgument(secondOp, 1)
+                firstOp.type!!.operatorEq(firstPointedArgument, secondPointedArgument)
+            }
+            KtTokens.EXCLEQ -> {
+                if (firstOp.type is LLVMReferenceType)
+                    if (secondOp.type is LLVMReferenceType) {
+                        val firstPointedArgument = receivePointedArgument(firstOp, 1)
+                        val secondPointedArgument = receivePointedArgument(secondOp, 1)
+                        firstOp.type!!.operatorNeq(firstPointedArgument, secondPointedArgument)
+                    } else
+                        firstOp.type!!.operatorNeq(firstNativeOp, secondOp)
+                else
+                    firstOp.type!!.operatorNeq(firstNativeOp, secondNativeOp)
+            }
+            KtTokens.EXCLEQEQEQ -> {
+                val firstPointedArgument = receivePointedArgument(firstOp, 1)
+                val secondPointedArgument = receivePointedArgument(secondOp, 1)
+                firstOp.type!!.operatorNeq(firstPointedArgument, secondPointedArgument)
+            }
             KtTokens.EQ -> {
                 if (secondOp.type is LLVMNullType) {
                     val result = codeBuilder.getNewVariable(firstOp.type!!, firstOp.pointer)
@@ -684,11 +706,19 @@ abstract class BlockCodegen(val state: TranslationState, val variableManager: Va
         return resultOp
     }
 
+    private fun receivePointedArgument(variable: LLVMSingleValue, pointer: Int): LLVMSingleValue {
+        var currentVariable = variable
+        while (currentVariable.pointer > pointer) {
+            currentVariable = codeBuilder.receiveNativeValue(variable)
+        }
+        return currentVariable
+    }
+
     private fun evaluateConstantExpression(expr: KtConstantExpression): LLVMConstant {
         val expressionKotlinType = state.bindingContext?.get(BindingContext.EXPRESSION_TYPE_INFO, expr)!!.type!!
         val expressionValue = state.bindingContext?.get(BindingContext.COMPILE_TIME_VALUE, expr)?.getValue(expressionKotlinType)
 
-        val type = LLVMMapStandardType(expressionKotlinType)
+        val type = LLVMMapStandardType(expressionKotlinType, state)
 
         return LLVMConstant(expressionValue?.toString() ?: "", type, pointer = 0)
     }
@@ -745,7 +775,7 @@ abstract class BlockCodegen(val state: TranslationState, val variableManager: Va
 
     private fun executeIfExpression(conditionResult: LLVMSingleValue, thenExpression: KtExpression, elseExpression: PsiElement?, ifExpression: KtIfExpression, scopeDepth: Int): LLVMVariable? {
         val kotlinType = state.bindingContext?.get(BindingContext.EXPRESSION_TYPE_INFO, ifExpression)!!.type!!
-        val expressionType = LLVMInstanceOfStandardType("type", kotlinType, LLVMVariableScope()).type
+        val expressionType = LLVMInstanceOfStandardType("type", kotlinType, LLVMVariableScope(), state).type
         val resultVariable = codeBuilder.getNewVariable(expressionType, pointer = 1)
         codeBuilder.allocStackPointedVarAsValue(resultVariable)
         val thenLabel = codeBuilder.getNewLabel(prefix = "if")
@@ -811,7 +841,7 @@ abstract class BlockCodegen(val state: TranslationState, val variableManager: Va
             }
             is LLVMConstant -> {
                 if (assignExpression.type is LLVMNullType) {
-                    val reference = LLVMInstanceOfStandardType(identifier, variable.type)
+                    val reference = LLVMInstanceOfStandardType(identifier, variable.type, state = state)
                     if (state.classes.containsKey(variable.type.toString().dropLast(1))) {
                         (reference.type as LLVMReferenceType).prefix = "class"
                     }
@@ -888,7 +918,7 @@ abstract class BlockCodegen(val state: TranslationState, val variableManager: Va
         codeBuilder.addComment("start when expression")
         val whenExpression = expr.subjectExpression
         val kotlinType = state.bindingContext?.get(BindingContext.EXPRESSION_TYPE_INFO, expr)!!.type!!
-        val expressionType = LLVMInstanceOfStandardType("type", kotlinType, LLVMVariableScope()).type
+        val expressionType = LLVMInstanceOfStandardType("type", kotlinType, LLVMVariableScope(), state).type
 
         val targetExpression = evaluateExpression(whenExpression, scopeDepth + 1)!!
 

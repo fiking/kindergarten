@@ -16,7 +16,7 @@ class ObjectCodegen(state: TranslationState,
     StructCodegen(state, variableManager, objectDeclaration, state.bindingContext?.get(BindingContext.CLASS, objectDeclaration) ?: throw TranslationException(), codeBuilder, parentCodegen = parentCodegen) {
     override var size: Int = 0
     override var structName: String = objectDeclaration.name!!
-    override val type: LLVMReferenceType = LLVMReferenceType(structName, "class", byRef = true)
+    override val type: LLVMReferenceType = LLVMReferenceType(structName, "class", align = state.pointerAllign, size = state.pointerSize, byRef = true)
 
     init {
         if (parentCodegen != null) {
@@ -24,13 +24,19 @@ class ObjectCodegen(state: TranslationState,
             type.location.add(parentCodegen.structName)
         }
         generateInnerFields(objectDeclaration.declarations)
+        calculateTypeSize()
+        type.size = size
+        type.align = state.pointerAllign
     }
 
     override fun prepareForGenerate() {
         super.prepareForGenerate()
 
         val classInstance = LLVMVariable("object.instance.$fullName", type, objectDeclaration.name, LLVMVariableScope(), pointer = 1)
-        codeBuilder.addGlobalInitialize(classInstance, type)
+        codeBuilder.addGlobalInitialize(classInstance, fields, initializedFields.map {
+            val type = state.bindingContext?.get(BindingContext.EXPRESSION_TYPE_INFO, it.value)!!.type!!
+            Pair(it.key, state.bindingContext.get(BindingContext.COMPILE_TIME_VALUE, it.value)!!.getValue(type).toString())
+        }.toMap(), type)
         variableManager.addGlobalVariable(fullName, classInstance)
     }
 

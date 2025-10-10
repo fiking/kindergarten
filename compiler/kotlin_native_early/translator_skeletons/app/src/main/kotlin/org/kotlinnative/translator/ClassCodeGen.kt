@@ -23,9 +23,10 @@ class ClassCodegen(state: TranslationState,
 
     override var size: Int = 0
     override var structName: String = clazz.name!!
-    override val type: LLVMReferenceType = LLVMReferenceType(structName, "class", byRef = true)
+    override val type: LLVMReferenceType
 
     init {
+        type = LLVMReferenceType(structName, "class", align = state.pointerAllign, size = state.pointerSize, byRef = true)
         if (parentCodegen != null) {
             type.location.addAll(parentCodegen.type.location)
             type.location.add(parentCodegen.structName)
@@ -37,7 +38,9 @@ class ClassCodegen(state: TranslationState,
 
         indexFields(parameterList)
         generateInnerFields(clazz.declarations)
+        calculateTypeSize()
         type.size = size
+        type.align = state.pointerAllign
     }
 
     private fun indexFields(parameters: List<KtParameter>) {
@@ -52,7 +55,6 @@ class ClassCodegen(state: TranslationState,
             constructorFields.add(item)
             fields.add(item)
             fieldsIndex[item.label] = item
-            size += type.size
         }
     }
     override fun prepareForGenerate() {

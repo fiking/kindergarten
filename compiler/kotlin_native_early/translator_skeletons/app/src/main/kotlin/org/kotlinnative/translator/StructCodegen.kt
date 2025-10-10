@@ -46,6 +46,8 @@ abstract class StructCodegen(val state: TranslationState,
         get() = "${if (type.location.size > 0) "${type.location.joinToString(".")}." else ""}$structName"
 
     open fun prepareForGenerate() {
+        generateStruct()
+
         for (declaration in classOrObject.declarations) {
             when (declaration) {
                 is KtNamedFunction -> {
@@ -57,7 +59,6 @@ abstract class StructCodegen(val state: TranslationState,
     }
 
     open fun generate() {
-        generateStruct()
         generateEnumFields()
         generatePrimaryConstructor()
 
@@ -81,12 +82,11 @@ abstract class StructCodegen(val state: TranslationState,
                     field.offset = offset
                     offset++
 
-                    if ((declaration.initializer != null) && this !is ObjectCodegen) {
+                    if (declaration.initializer != null) {
                         initializedFields.put(field, declaration.initializer!!)
                     }
                     fields.add(field)
                     fieldsIndex[field.label] = field
-                    size += field.type.size
                 }
                 is KtEnumEntry -> {
                     val name = declaration.name!!
@@ -181,12 +181,16 @@ abstract class StructCodegen(val state: TranslationState,
         }
         val blockCodegen = object : BlockCodegen(state, variableManager, codeBuilder) {}
         val receiverThis = LLVMVariable("classvariable.this.addr", type, scope = LLVMRegisterScope(), pointer = 1)
+        codeBuilder.addComment("field initilizers starts")
         for ((variable, initializer) in initializedFields) {
             val left = blockCodegen.evaluateMemberMethodOrField(receiverThis, variable.label, blockCodegen.topLevel, call = null)!!
+            codeBuilder.addComment("left expression")
             val right = blockCodegen.evaluateExpression(initializer, scopeDepth = blockCodegen.topLevel)!!
-
+            codeBuilder.addComment("right expression")
             blockCodegen.executeBinaryExpression(KtTokens.EQ, referenceName = null, left = left, right = right)
+            codeBuilder.addComment("next initializer")
         }
+        codeBuilder.addComment("field initilizers ends")
     }
 
     private fun generateReturn() {
@@ -202,7 +206,7 @@ abstract class StructCodegen(val state: TranslationState,
     protected fun resolveType(field: KtNamedDeclaration, ktType: KotlinType): LLVMClassVariable {
         val annotations = parseFieldAnnotations(field)
 
-        val result = LLVMInstanceOfStandardType(field.name!!, ktType, LLVMRegisterScope())
+        val result = LLVMInstanceOfStandardType(field.name!!, ktType, LLVMRegisterScope(), state = state)
 
         if (result.type is LLVMReferenceType) {
             val type = result.type as LLVMReferenceType
@@ -211,6 +215,10 @@ abstract class StructCodegen(val state: TranslationState,
 
             val location = ktType.getSubtypesPredicate().toString().split(".").dropLast(1)
             type.location.addAll(location)
+        }
+
+        if (state.classes.containsKey(field.name!!)) {
+            return LLVMClassVariable(result.label, state.classes[field.name!!]!!.type, result.pointer)
         }
 
         if (annotations.contains("Plain")) {
@@ -243,5 +251,22 @@ abstract class StructCodegen(val state: TranslationState,
             blockCodegen.generate(init.body)
         }
 
+    }
+
+    fun calculateTypeSize() {
+        val classAlignment = fields.map { it.type.align }.max()?.toInt() ?: 0
+        var alignmentRemainder = 0
+        size = 0
+
+        for (item in fields) {
+            val currentFieldType = if (item.pointer > 0) state.pointerSize else item.type.size
+            alignmentRemainder -= (alignmentRemainder % currentFieldType)
+            if (alignmentRemainder < currentFieldType) {
+                size += classAlignment
+                alignmentRemainder = classAlignment - currentFieldType
+            } else {
+                alignmentRemainder -= currentFieldType
+            }
+        }
     }
 }

@@ -7,6 +7,11 @@ class LLVMVoidType() : LLVMType() {
     override fun mangle() = ""
     override val typename = "void"
     override val defaultValue: String = ""
+
+    override fun equals(other: Any?): Boolean {
+        return other is LLVMVoidType
+    }
+
     override fun hashCode() =
         typename.hashCode()
 }

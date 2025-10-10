@@ -71,7 +71,7 @@ class LLVMLongType() : LLVMType() {
     override fun hashCode() =
         mangle().hashCode()
 
-    override val align = 4
+    override val align = 8
     override var size: Int = 8
     override val defaultValue = "0"
 
