@@ -26,4 +26,8 @@ class LLVMDoubleType() : LLVMType() {
         firstOp: LLVMSingleValue,
         secondOp: LLVMSingleValue
     ): LLVMExpression = LLVMExpression(LLVMDoubleType(), "fsub double i32 $firstOp, $secondOp")
+
+    override fun equals(other: Any?): Boolean {
+        return other is LLVMDoubleType
+    }
 }

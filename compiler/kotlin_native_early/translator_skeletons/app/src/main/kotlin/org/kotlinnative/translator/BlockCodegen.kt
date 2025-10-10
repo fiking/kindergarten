@@ -76,16 +76,15 @@ abstract class BlockCodegen(val state: TranslationState, val variableManager: Va
     }
 
     private fun evaluateDoWhileExpression(element: PsiElement, scopeDepth: Int) {
-        val bodyExpression = element.getNextSiblingIgnoringWhitespaceAndComments() ?: return
-        val condition = bodyExpression.siblings(withItself = false).filter { it is KtContainerNode }.firstOrNull() ?: return
-
-        executeWhileBlock(condition.firstChild as KtBinaryExpression, bodyExpression.firstChild, scopeDepth, checkConditionBeforeExecute = false)
+        val expr = element.context as KtDoWhileExpression
+        executeWhileBlock(expr.condition!!, expr.body!!, scopeDepth, checkConditionBeforeExecute = false)
     }
 
     fun evaluateExpression(expr: PsiElement?, scopeDepth: Int): LLVMSingleValue? {
         return when (expr) {
             is KtBinaryExpression -> evaluateBinaryExpression(expr, scopeDepth)
             is KtPostfixExpression -> evaluatePostfixExpression(expr, scopeDepth)
+            is KtPrefixExpression -> evaluatePrefixExpression(expr, scopeDepth)
             is KtConstantExpression -> evaluateConstantExpression(expr)
             is KtCallExpression -> evaluateCallExpression(expr, scopeDepth)
             is KtWhenExpression -> evaluateWhenExpression(expr, scopeDepth)
@@ -177,7 +176,8 @@ abstract class BlockCodegen(val state: TranslationState, val variableManager: Va
 
         var receiver = when (receiverExpr) {
             is KtCallExpression,
-            is KtBinaryExpression -> evaluateExpression(receiverExpr, scopeDepth) as LLVMVariable
+            is KtBinaryExpression,
+            is KtDotQualifiedExpression -> evaluateExpression(receiverExpr, scopeDepth) as LLVMVariable
             is KtNameReferenceExpression ->{
                 val referenceContext = state.bindingContext?.get(BindingContext.REFERENCE_TARGET, receiverExpr)
                 variableManager[receiverName]
@@ -205,6 +205,32 @@ abstract class BlockCodegen(val state: TranslationState, val variableManager: Va
         val clazz = state.classes[receiverName] ?: return evaluateExtensionExpression(receiverExpr, selectorExpr as KtCallExpression, scopeDepth)
 
         return evaluateClassScopedDotExpression(clazz, selectorExpr, scopeDepth)
+    }
+
+    private fun evaluatePrefixExpression(expr: KtPrefixExpression, scopeDepth: Int): LLVMSingleValue? {
+        val operator = expr.operationToken
+        val left = evaluateExpression(expr.baseExpression, scopeDepth) ?: throw UnsupportedOperationException("Wrong binary exception")
+        return executePrefixExpression(operator, expr.operationReference, left as LLVMSingleValue)
+    }
+
+    private fun executePrefixExpression(operator: IElementType?, operationReference: KtSimpleNameExpression, left: LLVMSingleValue): LLVMSingleValue?
+            = addPrimitivePrefixOperation(operator, operationReference, left)
+
+    private fun addPrimitivePrefixOperation(operator: IElementType?, operationReference: KtSimpleNameExpression, firstOp: LLVMSingleValue): LLVMSingleValue? {
+        when (operator) {
+            KtTokens.MINUS,
+            KtTokens.PLUS -> {
+                return addPrimitiveBinaryOperation(operator!!, operationReference, LLVMConstant("0", firstOp.type), firstOp)
+            }
+            KtTokens.EXCL -> {
+                val firstNativeOp = codeBuilder.receiveNativeValue(firstOp)
+                val llvmExpression = addPrimitiveReferenceOperationByName("xor", LLVMConstant("true", LLVMBooleanType()), firstNativeOp)
+                val resultOp = codeBuilder.getNewVariable(llvmExpression.variableType)
+                codeBuilder.addAssignment(resultOp, llvmExpression)
+                return resultOp
+            }
+            else -> throw UnsupportedOperationException()
+        }
     }
 
     private fun evaluateExtensionExpression(receiver: KtExpression, selector: KtCallExpression, scopeDepth: Int): LLVMSingleValue? {
@@ -524,7 +550,7 @@ abstract class BlockCodegen(val state: TranslationState, val variableManager: Va
             left ?: throw UnsupportedOperationException("Wrong binary exception")
         }
 
-        val right = evaluateExpression(expr.lastChild, scopeDepth) ?: throw UnsupportedOperationException("Wrong binary exception")
+        val right = evaluateExpression(expr.lastChild, scopeDepth) ?: throw UnsupportedOperationException("Wrong binary exception: ${expr.text}")
 
         return executeBinaryExpression(operator, expr.operationReference, left, right)
     }
@@ -623,28 +649,22 @@ abstract class BlockCodegen(val state: TranslationState, val variableManager: Va
         return when (element.elementType) {
             KtTokens.RETURN_KEYWORD -> evaluateReturnInstruction(element, scopeDepth)
             KtTokens.IF_KEYWORD -> evaluateIfOperator(element.context as KtIfExpression, scopeDepth, isExpression = false)
-            KtTokens.WHILE_KEYWORD -> evaluateWhileOperator(element, scopeDepth)
+            KtTokens.WHILE_KEYWORD -> evaluateWhileOperator(element.context as KtWhileExpression, scopeDepth)
             else -> null
         }
     }
 
-    private fun evaluateWhileOperator(element: LeafPsiElement, scopeDepth: Int): LLVMVariable? {
-        var getBrackets = element.getNextSiblingIgnoringWhitespaceAndComments() ?: return null
-        val condition = getBrackets.getNextSiblingIgnoringWhitespaceAndComments() ?: return null
-        getBrackets = condition.getNextSiblingIgnoringWhitespaceAndComments() ?: return null
-        val bodyExpression = getBrackets.getNextSiblingIgnoringWhitespaceAndComments() ?: return null
+    private fun evaluateWhileOperator(expr: KtWhileExpression, scopeDepth: Int): LLVMVariable? =
+        executeWhileBlock(expr.condition!!, expr.body!!, scopeDepth, checkConditionBeforeExecute = true)
 
-        return executeWhileBlock(condition.firstChild as KtBinaryExpression, bodyExpression.firstChild, scopeDepth, checkConditionBeforeExecute = true)
-    }
-
-    private fun executeWhileBlock(condition: KtBinaryExpression, bodyExpression: PsiElement, scopeDepth: Int, checkConditionBeforeExecute: Boolean): LLVMVariable? {
+    private fun executeWhileBlock(condition: KtExpression, bodyExpression: PsiElement, scopeDepth: Int, checkConditionBeforeExecute: Boolean): LLVMVariable? {
         val conditionLabel = codeBuilder.getNewLabel(prefix = "while")
         val bodyLabel = codeBuilder.getNewLabel(prefix = "while")
         val exitLabel = codeBuilder.getNewLabel(prefix = "while")
 
         codeBuilder.addUnconditionalJump(if (checkConditionBeforeExecute) conditionLabel else bodyLabel)
         codeBuilder.markWithLabel(conditionLabel)
-        val conditionResult = evaluateBinaryExpression(condition, scopeDepth + 1)!!
+        val conditionResult = evaluateExpression(condition, scopeDepth + 1)!!
 
         codeBuilder.addCondition(conditionResult, bodyLabel, exitLabel)
         evaluateCodeBlock(bodyExpression, bodyLabel, conditionLabel, scopeDepth + 1)
@@ -791,7 +811,11 @@ abstract class BlockCodegen(val state: TranslationState, val variableManager: Va
         codeBuilder.addComment("last condition item")
         codeBuilder.addUnconditionalJump(if (isElse) successConditionsLabel else elseLabel)
         codeBuilder.markWithLabel(successConditionsLabel)
-        val successExpression = evaluateExpression(item.expression, scopeDepth + 1)
+
+        var successExpression = evaluateExpression(item.expression, scopeDepth + 1)
+        while (successExpression is LLVMVariable && successExpression.pointer > 0) {
+            successExpression = codeBuilder.loadAndGetVariable(successExpression)
+        }
         codeBuilder.storeVariable(resultVariable, successExpression ?: return)
         codeBuilder.addUnconditionalJump(endLabel)
         codeBuilder.addComment("end last condition item")
@@ -842,7 +866,7 @@ abstract class BlockCodegen(val state: TranslationState, val variableManager: Va
     private fun evaluatePostfixExpression(expr: KtPostfixExpression, scopeDepth: Int): LLVMSingleValue? {
         val operator = expr.operationToken
 
-        val left = evaluateExpression(expr.baseExpression, scopeDepth) ?: throw UnsupportedOperationException("Wrong binary exception")
+        val left = evaluateExpression(expr.baseExpression, scopeDepth) ?: throw UnsupportedOperationException("Wrong binary exception: ${expr.text}")
 
         return executePostfixExpression(operator, expr.operationReference, left as LLVMVariable)
     }
@@ -874,9 +898,12 @@ abstract class BlockCodegen(val state: TranslationState, val variableManager: Va
         }
     }
 
-    fun addPrimitiveReferenceOperation(referenceName: KtSimpleNameExpression, firstOp: LLVMSingleValue, secondNativeOp: LLVMSingleValue): LLVMExpression {
+    fun addPrimitiveReferenceOperation(referenceName: KtSimpleNameExpression, firstOp: LLVMSingleValue, secondNativeOp: LLVMSingleValue): LLVMExpression
+            = addPrimitiveReferenceOperationByName(referenceName.getReferencedName(), firstOp, secondNativeOp)
+
+    fun addPrimitiveReferenceOperationByName(operator: String, firstOp: LLVMSingleValue, secondNativeOp: LLVMSingleValue): LLVMExpression {
         val firstNativeOp = codeBuilder.receiveNativeValue(firstOp)
-        return when (referenceName.getReferencedName()) {
+        return when (operator) {
             "or" -> firstNativeOp.type!!.operatorOr(firstNativeOp, secondNativeOp)
             "xor" -> firstNativeOp.type!!.operatorXor(firstNativeOp, secondNativeOp)
             "and" -> firstNativeOp.type!!.operatorAnd(firstNativeOp, secondNativeOp)

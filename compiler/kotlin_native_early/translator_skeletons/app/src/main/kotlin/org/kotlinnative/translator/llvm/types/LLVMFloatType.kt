@@ -17,6 +17,10 @@ class LLVMFloatType() : LLVMType() {
     override fun operatorPlus(firstOp: LLVMSingleValue, secondOp: LLVMSingleValue): LLVMExpression =
         LLVMExpression(LLVMFloatType(), "fadd float $firstOp, $secondOp")
 
+    override fun equals(other: Any?): Boolean {
+        return other is LLVMFloatType
+    }
+
     override val align = 4
     override var size: Int = 4
     override fun toString() = "float"

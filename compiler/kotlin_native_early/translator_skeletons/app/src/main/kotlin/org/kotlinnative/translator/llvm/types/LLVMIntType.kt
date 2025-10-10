@@ -77,4 +77,8 @@ class LLVMIntType() : LLVMType() {
         is LLVMShortType -> LLVMExpression(LLVMBooleanType(), "  sext ${source.type} $source to i32")
         else -> throw UnimplementedException()
     }
+
+    override fun equals(other: Any?): Boolean {
+        return other is LLVMIntType
+    }
 }
