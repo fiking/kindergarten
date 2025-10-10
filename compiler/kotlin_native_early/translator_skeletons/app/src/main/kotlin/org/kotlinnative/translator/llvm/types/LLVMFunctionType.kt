@@ -8,6 +8,7 @@ class LLVMFunctionType(type: KotlinType) : LLVMType() {
     override val align: Int = 4
     override var size: Int = 4
     override val defaultValue: String = ""
+    override val typename = "FunctionType"
 
     val arguments : List<LLVMVariable>
     val returnType : LLVMVariable

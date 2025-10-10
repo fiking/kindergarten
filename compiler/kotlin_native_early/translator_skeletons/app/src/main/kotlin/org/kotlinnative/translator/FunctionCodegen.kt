@@ -1,5 +1,6 @@
 package org.kotlinnative.translator
 
+import org.jetbrains.kotlin.cfg.pseudocode.getSubtypesPredicate
 import org.jetbrains.kotlin.psi.KtNamedFunction
 import org.jetbrains.kotlin.psi.psiUtil.getNextSiblingIgnoringWhitespaceAndComments
 import org.jetbrains.kotlin.psi.psiUtil.isExtensionDeclaration
@@ -34,13 +35,16 @@ class FunctionCodegen(state: TranslationState,
         })
 
         returnType = LLVMInstanceOfStandardType("instance", descriptor.returnType!!)
+        if (returnType!!.type is LLVMReferenceType) {
+            (returnType!!.type as LLVMReferenceType).location.addAll(descriptor.returnType!!.getSubtypesPredicate().toString().split(".").dropLast(1))
+        }
         external = isExternal()
         name = "${function.fqName}${if (args.size > 0 && !external) "_${args.joinToString(separator = "_", transform = { it.type.mangle() })}" else ""}"
 
         if (isExtensionDeclaration) {
             val receiverType = descriptor.extensionReceiverParameter!!.type
             val translatorType = LLVMMapStandardType(receiverType)
-            functionNamePrefix += translatorType.toString() + "."
+            functionNamePrefix += translatorType.typename + "."
 
             val extensionFunctionsOfThisType = state.extensionFunctions.getOrDefault(translatorType.toString(), HashMap())
             extensionFunctionsOfThisType.put(name, this)
@@ -99,7 +103,11 @@ class FunctionCodegen(state: TranslationState,
             val receiverParameter = state.bindingContext?.get(BindingContext.FUNCTION, function)!!.extensionReceiverParameter!!
             val receiverType = receiverParameter.type
             val translatorType : LLVMType = LLVMMapStandardType(receiverType)
-            val classVal = LLVMVariable("classvariable.this", translatorType, pointer = 0)
+
+            val classVal = when (translatorType) {
+                is LLVMReferenceType -> LLVMVariable("classvariable.this", translatorType, pointer = 1)
+                else -> LLVMVariable("type", translatorType, pointer = 0)
+            }
             variableManager.addVariable("this", classVal, 0)
             actualArgs.add(classVal)
         }

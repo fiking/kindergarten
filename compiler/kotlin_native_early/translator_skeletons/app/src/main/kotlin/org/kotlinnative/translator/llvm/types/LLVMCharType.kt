@@ -25,6 +25,12 @@ class LLVMCharType() : LLVMType() {
     override fun equals(other: Any?): Boolean {
         return other is LLVMCharType
     }
+    override fun hashCode(): Int{
+        var result = align
+        result = 31 * result + size
+        result = 31 * result + defaultValue.hashCode()
+        return result
+    }
 
     override val align = 1
     override var size: Int = 1
@@ -32,4 +38,5 @@ class LLVMCharType() : LLVMType() {
     override val defaultValue = "0"
     override fun isPrimitive() = true
     override fun mangle() = "Char"
+    override val typename = "i8"
 }

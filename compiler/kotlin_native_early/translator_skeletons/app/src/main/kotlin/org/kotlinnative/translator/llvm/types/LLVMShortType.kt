@@ -9,6 +9,7 @@ class LLVMShortType() : LLVMType() {
     override val align: Int = 2
     override var size: Int = 2
     override val defaultValue: String = "0"
+    override val typename = "i16"
     override fun isPrimitive() = true
     override fun mangle() = "Short"
 
@@ -32,5 +33,11 @@ class LLVMShortType() : LLVMType() {
 
     override fun equals(other: Any?): Boolean {
         return other is LLVMShortType
+    }
+    override fun hashCode(): Int{
+        var result = size
+        result = 31 * result + align
+        result = 31 * result + defaultValue.hashCode()
+        return result
     }
 }

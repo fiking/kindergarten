@@ -11,6 +11,7 @@ class LLVMDoubleType() : LLVMType() {
     override val defaultValue = "0.0"
     override fun isPrimitive() = true
     override fun mangle() = "Double"
+    override val typename = "double"
 
     override fun operatorPlus(
         firstOp: LLVMSingleValue,
@@ -29,5 +30,11 @@ class LLVMDoubleType() : LLVMType() {
 
     override fun equals(other: Any?): Boolean {
         return other is LLVMDoubleType
+    }
+    override fun hashCode(): Int{
+        var result = align
+        result = 31 * result + size
+        result = 31 * result + defaultValue.hashCode()
+        return result
     }
 }

@@ -53,6 +53,13 @@ class LLVMBooleanType() : LLVMType() {
         return other is LLVMBooleanType
     }
 
+    override fun hashCode(): Int{
+        var result = align
+        result = 31 * result + size
+        result = 31 * result + defaultValue.hashCode()
+        return result
+    }
+
     override val align = 4
     override var size: Int = 1
     override val defaultValue = "0"
@@ -60,4 +67,5 @@ class LLVMBooleanType() : LLVMType() {
     override fun mangle() = "Boolean"
 
     override fun toString() = "i1"
+    override val typename = "i1"
 }

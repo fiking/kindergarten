@@ -5,5 +5,6 @@ class LLVMVoidType() : LLVMType() {
     override val align: Int = 0
     override var size: Int = 0
     override fun mangle() = ""
+    override val typename = "void"
     override val defaultValue: String = ""
 }

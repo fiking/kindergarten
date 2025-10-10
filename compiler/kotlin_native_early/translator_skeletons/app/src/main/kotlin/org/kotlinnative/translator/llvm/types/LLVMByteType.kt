@@ -11,6 +11,7 @@ class LLVMByteType() : LLVMType() {
     override val defaultValue = "0"
     override fun isPrimitive() = true
     override fun mangle() = "Byte"
+    override val typename = "i8"
 
     override fun operatorLt(firstOp: LLVMSingleValue, secondOp: LLVMSingleValue): LLVMExpression =
         LLVMExpression(LLVMIntType(), "icmp slt i8 $firstOp, $secondOp")
@@ -32,5 +33,11 @@ class LLVMByteType() : LLVMType() {
 
     override fun equals(other: Any?): Boolean {
         return other is LLVMByteType
+    }
+    override fun hashCode(): Int{
+        var result = align
+        result = 31 * result + size
+        result = 31 * result + defaultValue.hashCode()
+        return result
     }
 }
