@@ -8,9 +8,12 @@ import org.kotlinnative.translator.llvm.types.LLVMByteType
 import org.kotlinnative.translator.llvm.types.LLVMCharType
 
 import org.kotlinnative.translator.llvm.types.LLVMDoubleType
+import org.kotlinnative.translator.llvm.types.LLVMFloatType
 import org.kotlinnative.translator.llvm.types.LLVMFunctionType
 import org.kotlinnative.translator.llvm.types.LLVMIntType
+import org.kotlinnative.translator.llvm.types.LLVMLongType
 import org.kotlinnative.translator.llvm.types.LLVMReferenceType
+import org.kotlinnative.translator.llvm.types.LLVMShortType
 import org.kotlinnative.translator.llvm.types.LLVMType
 import org.kotlinnative.translator.llvm.types.LLVMVoidType
 
@@ -31,11 +34,14 @@ fun LLVMInstanceOfStandardType(name: String, type: KotlinType?, scope: LLVMScope
             pointer = 1
         )
 
-        type.toString() == "Int" -> LLVMVariable(name, LLVMIntType(), name, scope)
-        type.toString() == "Double" -> LLVMVariable(name, LLVMDoubleType(), name, scope)
+        type.toString() == "Boolean" -> LLVMVariable(name, LLVMBooleanType(), name, scope)
         type.toString() == "Byte" -> LLVMVariable(name, LLVMByteType(), name, scope)
         type.toString() == "Char" -> LLVMVariable(name, LLVMCharType(), name, scope)
-        type.toString() == "Boolean" -> LLVMVariable(name, LLVMBooleanType(), name, scope)
+        type.toString() == "Short" -> LLVMVariable(name, LLVMShortType(), name, scope)
+        type.toString() == "Int" -> LLVMVariable(name, LLVMIntType(), name, scope)
+        type.toString() == "Long" -> LLVMVariable(name, LLVMLongType(), name, scope)
+        type.toString() == "Float" -> LLVMVariable(name, LLVMFloatType(), name, scope)
+        type.toString() == "Double" -> LLVMVariable(name, LLVMDoubleType(), name, scope)
         type.isUnit() -> LLVMVariable("", LLVMVoidType(), "", scope)
         type.isMarkedNullable -> LLVMVariable(name, LLVMReferenceType(type.toString().dropLast(1)), name, scope, pointer = 1)
         else -> LLVMVariable(name, LLVMReferenceType(type.toString()), name, scope, pointer = 1)

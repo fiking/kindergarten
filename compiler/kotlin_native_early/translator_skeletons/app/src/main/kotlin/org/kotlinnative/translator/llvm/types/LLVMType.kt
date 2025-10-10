@@ -31,11 +31,13 @@ abstract class LLVMType() : Cloneable {
 }
 
 fun parseLLVMType(type: String): LLVMType = when(type) {
+    "i64" -> LLVMLongType()
     "i32" -> LLVMIntType()
     "i16" -> LLVMShortType()
     "i8" -> LLVMByteType()
     "i1" -> LLVMBooleanType()
     "double" -> LLVMDoubleType()
+    "float" -> LLVMFloatType()
     "Unit" -> LLVMVoidType()
     else -> LLVMReferenceType(type)
 }
