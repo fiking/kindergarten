@@ -26,6 +26,10 @@ class ClassCodegen(state: TranslationState,
     override val type: LLVMReferenceType = LLVMReferenceType(structName, "class", byRef = true)
 
     init {
+        if (parentCodegen != null) {
+            type.location.addAll(parentCodegen.type.location)
+            type.location.add(parentCodegen.structName)
+        }
         val descriptor = state.bindingContext?.get(BindingContext.CLASS, clazz) //?: throw TranslationException()
         val parameterList = clazz.getPrimaryConstructorParameterList()?.parameters ?: listOf()
         annotation = descriptor?.kind == ClassKind.ANNOTATION_CLASS
@@ -33,11 +37,6 @@ class ClassCodegen(state: TranslationState,
 
         indexFields(parameterList)
         generateInnerFields(clazz.declarations)
-
-        if (parentCodegen != null) {
-            type.location.addAll(parentCodegen.type.location)
-            type.location.add(parentCodegen.structName)
-        }
         type.size = size
     }
 
@@ -80,19 +79,7 @@ class ClassCodegen(state: TranslationState,
         nestedClasses.forEach { x, classCodegen -> classCodegen.generate() }
 
         if (companionObjectCodegen != null) {
-            val companionObject = clazz.getCompanionObjects().first()
-            val companionObjectName = structName + "." + companionObject.name
             companionObjectCodegen!!.generate()
-
-            for ((key, value) in companionObjectCodegen!!.methods) {
-                val methodName = key.removePrefix(companionObjectName + ".")
-                companionMethods.put(structName + "." + methodName, value)
-            }
-            companionFields.addAll(companionObjectCodegen!!.fields)
-            for (field in companionObjectCodegen!!.fields) {
-                companionFieldsSource.put(field.label, companionObjectCodegen!!)
-            }
-            companionFieldsIndex.putAll(companionObjectCodegen!!.fieldsIndex)
         }
     }
 }

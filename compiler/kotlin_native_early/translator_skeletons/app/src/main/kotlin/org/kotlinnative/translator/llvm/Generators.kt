@@ -1,6 +1,7 @@
 package org.kotlinnative.translator.llvm
 
 import org.jetbrains.kotlin.builtins.isFunctionTypeOrSubtype
+import org.jetbrains.kotlin.cfg.pseudocode.getSubtypesPredicate
 import org.jetbrains.kotlin.js.descriptorUtils.nameIfStandardType
 import org.jetbrains.kotlin.types.KotlinType
 import org.jetbrains.kotlin.types.typeUtil.isUnit
@@ -49,8 +50,13 @@ fun LLVMInstanceOfStandardType(name: String, type: KotlinType?, scope: LLVMScope
         type.nameIfStandardType.toString() == "Nothing" -> LLVMVariable(name,
             LLVMNullType(), name, scope)
         type.isUnit() -> LLVMVariable("", LLVMVoidType(), "", scope)
-        type.isMarkedNullable -> LLVMVariable(name, LLVMReferenceType(type.toString().dropLast(1)), name, scope, pointer = 1)
-        else -> LLVMVariable(name, LLVMReferenceType(type.toString(), prefix = "class"), name, scope, pointer = 1)
+        type.isMarkedNullable -> LLVMVariable(name, LLVMReferenceType(type.toString().dropLast(1), prefix = "class"), name, scope, pointer = 1)
+        else -> {
+            val refType = LLVMReferenceType(type.toString(), prefix = "class")
+            val result = LLVMVariable(name, refType, name, scope, pointer = 1)
+            refType.location.addAll(type.getSubtypesPredicate().toString().split(".").dropLast(1))
+            result
+        }
     }
 }
 
