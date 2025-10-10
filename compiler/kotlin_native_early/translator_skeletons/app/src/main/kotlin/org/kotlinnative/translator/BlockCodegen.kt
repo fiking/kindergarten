@@ -456,7 +456,7 @@ abstract class BlockCodegen(open val state: TranslationState, open val variableM
                 codeBuilder.storeVariable(result, secondNativeOp)
                 return result
             }
-            else -> codeBuilder.addPrimitiveReferenceOperation(referenceName!!, firstNativeOp, secondNativeOp)
+            else -> addPrimitiveReferenceOperation(referenceName!!, firstNativeOp, secondNativeOp)
         }
         val resultOp = codeBuilder.getNewVariable(llvmExpression.variableType)
         codeBuilder.addAssignment(resultOp, llvmExpression)
@@ -741,6 +741,40 @@ abstract class BlockCodegen(open val state: TranslationState, open val variableM
                 return oldValue
             }
             else -> throw UnsupportedOperationException()
+        }
+    }
+
+    fun addPrimitiveReferenceOperation(referenceName: KtSimpleNameExpression, firstOp: LLVMSingleValue, secondNativeOp: LLVMSingleValue): LLVMExpression {
+        val firstNativeOp = codeBuilder.receiveNativeValue(firstOp)
+        return when (referenceName.getReferencedName()) {
+            "or" -> firstNativeOp.type!!.operatorOr(firstNativeOp, secondNativeOp)
+            "xor" -> firstNativeOp.type!!.operatorXor(firstNativeOp, secondNativeOp)
+            "and" -> firstNativeOp.type!!.operatorAnd(firstNativeOp, secondNativeOp)
+            "lhr" -> firstNativeOp.type!!.operatorShl(firstNativeOp, secondNativeOp)
+            "shr" -> firstNativeOp.type!!.operatorShr(firstNativeOp, secondNativeOp)
+            "ushr" -> firstNativeOp.type!!.operatorUshr(firstNativeOp, secondNativeOp)
+            "+=" -> {
+                val llvmExpression = firstNativeOp.type!!.operatorPlus(firstNativeOp, secondNativeOp)
+                val resultOp = codeBuilder.getNewVariable(llvmExpression.variableType)
+                codeBuilder.addAssignment(resultOp, llvmExpression)
+                codeBuilder.storeVariable(firstOp, resultOp)
+                return LLVMExpression(resultOp.type, "load ${firstOp.getType()} $firstOp, align ${firstOp.type!!.align}")
+            }
+            "-=" -> {
+                val llvmExpression = firstNativeOp.type!!.operatorMinus(firstNativeOp, secondNativeOp)
+                val resultOp = codeBuilder.getNewVariable(llvmExpression.variableType)
+                codeBuilder.addAssignment(resultOp, llvmExpression)
+                codeBuilder.storeVariable(firstOp, resultOp)
+                return LLVMExpression(resultOp.type, "load ${firstOp.getType()} $firstOp, align ${firstOp.type!!.align}")
+            }
+            "*=" -> {
+                val llvmExpression = firstNativeOp.type!!.operatorTimes(firstNativeOp, secondNativeOp)
+                val resultOp = codeBuilder.getNewVariable(llvmExpression.variableType)
+                codeBuilder.addAssignment(resultOp, llvmExpression)
+                codeBuilder.storeVariable(firstOp, resultOp)
+                return LLVMExpression(resultOp.type, "load ${firstOp.getType()} $firstOp, align ${firstOp.type!!.align}")
+            }
+            else -> throw UnsupportedOperationException("Unknown binary operator")
         }
     }
 }
