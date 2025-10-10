@@ -11,14 +11,14 @@ class BooleanArray(var size: Int) {
     }
 
     /** Returns the array element at the given [index]. This method can be called using the index operator. */
-    fun get(index: Int): Boolean {
+    operator fun get(index: Int): Boolean {
         val res = kotlinclib_get_byte(this.data, index) == Int.toByte()
         return res
     }
 
 
     /** Sets the element at the given [index] to the given [value]. This method can be called using the index operator. */
-    fun set(index: Int, value: Boolean) {
+    operator fun set(index: Int, value: Boolean) {
         if (value == true) {
             kotlinclib_set_byte(this.data, index, Int.toByte())
         }
