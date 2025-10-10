@@ -30,10 +30,10 @@ class LLVMFloatType() : LLVMType() {
         LLVMExpression(LLVMBooleanType(), "fcmp ogt float $firstOp, $secondOp")
 
     override fun operatorLeq(firstOp: LLVMSingleValue, secondOp: LLVMSingleValue): LLVMExpression =
-        LLVMExpression(LLVMBooleanType(), "fcmp ole float i32 $firstOp, $secondOp")
+        LLVMExpression(LLVMBooleanType(), "fcmp ole float $firstOp, $secondOp")
 
     override fun operatorGeq(firstOp: LLVMSingleValue, secondOp: LLVMSingleValue): LLVMExpression =
-        LLVMExpression(LLVMBooleanType(), "fcmp oge float i32 $firstOp, $secondOp")
+        LLVMExpression(LLVMBooleanType(), "fcmp oge float $firstOp, $secondOp")
 
     override fun operatorEq(firstOp: LLVMSingleValue, secondOp: LLVMSingleValue): LLVMExpression =
         LLVMExpression(LLVMBooleanType(), "fcmp oeq float $firstOp, $secondOp")

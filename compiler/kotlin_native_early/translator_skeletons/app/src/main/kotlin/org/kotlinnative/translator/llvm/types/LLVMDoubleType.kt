@@ -21,12 +21,12 @@ class LLVMDoubleType() : LLVMType() {
     override fun operatorTimes(
         firstOp: LLVMSingleValue,
         secondOp: LLVMSingleValue
-    ): LLVMExpression = LLVMExpression(LLVMDoubleType(), "fmul double i32 $firstOp, $secondOp")
+    ): LLVMExpression = LLVMExpression(LLVMDoubleType(), "fmul double $firstOp, $secondOp")
 
     override fun operatorMinus(
         firstOp: LLVMSingleValue,
         secondOp: LLVMSingleValue
-    ): LLVMExpression = LLVMExpression(LLVMDoubleType(), "fsub double i32 $firstOp, $secondOp")
+    ): LLVMExpression = LLVMExpression(LLVMDoubleType(), "fsub double $firstOp, $secondOp")
 
     override fun operatorInc(firstOp: LLVMSingleValue): LLVMExpression =
         LLVMExpression(LLVMDoubleType(), "fadd double $firstOp, 1.0")

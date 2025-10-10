@@ -19,6 +19,7 @@ import org.jetbrains.kotlin.resolve.calls.util.getValueArgumentsInParentheses
 import org.jetbrains.kotlin.resolve.constants.TypedCompileTimeConstant
 import org.jetbrains.kotlin.resolve.descriptorUtil.fqNameSafe
 import org.jetbrains.kotlin.resolve.scopes.receivers.ExpressionReceiver
+import org.jetbrains.kotlin.types.typeUtil.isPrimitiveNumberType
 import org.jetbrains.kotlin.utils.IDEAPluginsCompatibilityAPI
 import org.kotlinnative.translator.llvm.*
 import org.kotlinnative.translator.llvm.types.*
@@ -346,7 +347,7 @@ abstract class BlockCodegen(val state: TranslationState, val variableManager: Va
                         val type = receiver.type as LLVMReferenceType
                         val clazz = resolveClassOrObjectLocation(type) ?: throw UnexpectedException(type.toString())
 
-                        val method = clazz.methods[methodName]!!
+                        val method = clazz.methods[methodName] ?: throw UnexpectedException(expr.text)
                         val returnType = clazz.methods[methodName]!!.returnType!!.type
 
                         val loadedArgs = loadArgsIfRequired(names, method.args)
@@ -522,7 +523,11 @@ abstract class BlockCodegen(val state: TranslationState, val variableManager: Va
                 args.addAll(names)
 
                 codeBuilder.addLLVMCode(LLVMCall(LLVMVoidType(), function.toString(), args).toString())
-                return codeBuilder.loadAndGetVariable(returnVar)
+                if (returnVar.pointer == 2) {
+                    return returnVar
+                } else {
+                    return codeBuilder.loadAndGetVariable(returnVar)
+                }
             }
             else -> {
                 val result = codeBuilder.getNewVariable(returnType)
@@ -570,9 +575,8 @@ abstract class BlockCodegen(val state: TranslationState, val variableManager: Va
         codeBuilder.allocStaticVar(store)
         store.pointer++
 
-        val result = codeBuilder.getNewVariable(function.type)
-        result.pointer++
-        codeBuilder.allocStaticVar(result)
+        val result = codeBuilder.getNewVariable(function.type, pointer = 1)
+        codeBuilder.allocStackVar(result)
         result.pointer++
 
         codeBuilder.storeVariable(result, store)
@@ -704,9 +708,10 @@ abstract class BlockCodegen(val state: TranslationState, val variableManager: Va
                 firstOp.type!!.operatorNeq(firstPointedArgument, secondPointedArgument)
             }
             KtTokens.EQ -> {
+                codeBuilder.addComment("start variable assignment")
                 if (secondOp.type is LLVMNullType) {
                     val result = codeBuilder.getNewVariable(firstOp.type!!, firstOp.pointer)
-                    codeBuilder.allocStaticVar(result)
+                    codeBuilder.allocStackVar(result)
                     result.pointer++
 
                     codeBuilder.storeNull(result)
@@ -716,6 +721,7 @@ abstract class BlockCodegen(val state: TranslationState, val variableManager: Va
                 val result = firstOp as LLVMVariable
                 val sourceArgument = if (result.pointer == secondOp.pointer + 1) secondOp else secondNativeOp
                 codeBuilder.storeVariable(result, sourceArgument)
+                codeBuilder.addComment("end variable assignment")
                 return result
             }
             else -> addPrimitiveReferenceOperation(referenceName!!, firstNativeOp, secondNativeOp)
@@ -845,24 +851,35 @@ abstract class BlockCodegen(val state: TranslationState, val variableManager: Va
         val variable = state.bindingContext?.get(BindingContext.VARIABLE, element)!!
         val identifier = variable.name.toString()
 
-        val assignExpression = evaluateExpression(element.delegateExpressionOrInitializer, scopeDepth) ?: return null
+        val assignExpression = evaluateExpression(element.delegateExpressionOrInitializer, scopeDepth)
+        val expectedExpressionType = LLVMMapStandardType(variable.type, state)
+        val assignExpressionType = assignExpression?.type
 
         when (assignExpression) {
+            null,
             is LLVMVariable -> {
-                if (assignExpression.pointer < 2) {
-                    val allocVar = variableManager.receiveVariable(identifier, assignExpression.type, LLVMRegisterScope(), pointer = 0)
-                    codeBuilder.allocStaticVar(allocVar)
+                if (variable.type.isPrimitiveNumberType() || (assignExpression == null)) {
+                    val allocVar = variableManager.receiveVariable(identifier, expectedExpressionType, LLVMRegisterScope(), pointer =
+                        if (variable.type.isPrimitiveNumberType()) 0 else 1)
+                    codeBuilder.allocStackVar(allocVar)
                     allocVar.pointer++
                     allocVar.kotlinName = identifier
+
                     variableManager.addVariable(identifier, allocVar, scopeDepth)
-                    codeBuilder.copyVariable(assignExpression, allocVar)
+                    if (assignExpression != null) {
+                        if (assignExpression.type is LLVMReferenceType) {
+                            throw UnexpectedException(element.text)
+                        }
+
+                        addPrimitiveBinaryOperation(KtTokens.EQ, null, allocVar, assignExpression)
+                    }
                 } else {
-                    assignExpression.kotlinName = identifier
+                    (assignExpression as LLVMVariable).kotlinName = identifier
                     variableManager.addVariable(identifier, assignExpression, scopeDepth)
                 }
             }
             is LLVMConstant -> {
-                if (assignExpression.type is LLVMNullType) {
+                if (assignExpressionType!! is LLVMNullType) {
                     val reference = LLVMInstanceOfStandardType(identifier, variable.type, state = state)
                     if (state.classes.containsKey(variable.type.toString().dropLast(1))) {
                         (reference.type as LLVMReferenceType).prefix = "class"
@@ -877,9 +894,12 @@ abstract class BlockCodegen(val state: TranslationState, val variableManager: Va
                     return null
                 }
 
-                val newVar = variableManager.receiveVariable(identifier, assignExpression.type!!, LLVMRegisterScope(), pointer = 1)
+                val newVar = variableManager.receiveVariable(identifier, assignExpressionType, LLVMRegisterScope(), pointer = 1)
                 codeBuilder.addConstant(newVar, assignExpression)
                 variableManager.addVariable(identifier, newVar, scopeDepth)
+            }
+            null -> {
+                val xrptrz = 442
             }
             else -> {
                 throw UnsupportedOperationException()
@@ -890,12 +910,19 @@ abstract class BlockCodegen(val state: TranslationState, val variableManager: Va
 
     private fun evaluateReturnInstruction(element: PsiElement, scopeDepth: Int): LLVMVariable? {
         val next = element.getNextSiblingIgnoringWhitespaceAndComments()
-        val retVar = evaluateExpression(next, scopeDepth)
+        var retVar = evaluateExpression(next, scopeDepth)
         val type = retVar?.type ?: LLVMVoidType()
 
         when (type) {
             is LLVMReferenceType -> genReferenceReturn(retVar!!)
-            is LLVMNullType,
+            is LLVMNullType -> {
+                retVar = when (retVar) {
+                    is LLVMConstant -> LLVMConstant(retVar.value, LLVMNullType(returnType!!.type), returnType!!.pointer - 1)
+                    is LLVMVariable -> LLVMVariable(retVar.label, LLVMNullType(returnType!!.type), retVar.kotlinName, retVar.scope, returnType!!.pointer - 1)
+                    else -> throw IllegalStateException()
+                }
+                genReferenceReturn(retVar)
+            }
             is LLVMVoidType -> {
                 codeBuilder.addAnyReturn(LLVMVoidType())
             }
