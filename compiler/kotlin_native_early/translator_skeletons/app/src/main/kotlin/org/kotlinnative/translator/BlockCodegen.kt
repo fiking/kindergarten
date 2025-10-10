@@ -102,7 +102,17 @@ abstract class BlockCodegen(open val state: TranslationState, open val variableM
 
     private fun evaluateClassScopedDotExpression(clazz: ClassCodegen, selector: KtExpression, scopeDepth: Int): LLVMSingleValue? = when (selector) {
         is KtCallExpression -> evaluateCallExpression(selector, scopeDepth, clazz)
+        is KtReferenceExpression -> evaluateReferenceExpression(selector, scopeDepth, clazz)
         else -> throw UnsupportedOperationException()
+    }
+
+    private fun evaluatenameReferenceExpression(expr: KtNameReferenceExpression, scopeDepth: Int, classScope: ClassCodegen? = null): LLVMSingleValue? {
+        val fieldName = state.bindingContext?.get(BindingContext.REFERENCE_TARGET, expr)!!.name.toString()
+        val field = classScope!!.companionFieldsIndex[fieldName]
+
+        val result = codeBuilder.getNewVariable(field!!.type, pointer = 1)
+        codeBuilder.loadClassField(result, field, field.offset)
+        return result
     }
 
     private fun evaluateMemberMethodOrField(receiver: LLVMVariable, selectorName: String, scopeDepth: Int, call: PsiElement): LLVMSingleValue? {
@@ -152,8 +162,9 @@ abstract class BlockCodegen(open val state: TranslationState, open val variableM
         return indexVariable
     }
 
-    private fun evaluateReferenceExpression(expr: KtReferenceExpression, scopeDepth: Int): LLVMSingleValue? = when (expr) {
+    private fun evaluateReferenceExpression(expr: KtReferenceExpression, scopeDepth: Int, classScope: ClassCodegen? = null): LLVMSingleValue? = when (expr) {
         is KtArrayAccessExpression -> evaluateArrayAccessExpression(expr, scopeDepth + 1)
+        is KtNameReferenceExpression -> evaluatenameReferenceExpression(expr, scopeDepth + 1, classScope)
         else -> variableManager.getLLVMValue(expr.firstChild.text)
     }
 
