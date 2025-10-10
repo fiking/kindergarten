@@ -115,7 +115,8 @@ abstract class BlockCodegen(open val state: TranslationState, open val variableM
             return result
         }
 
-        val methodName = clazz.structName + '.' + selectorName.substringBefore('(')
+        val typePath = type.location.joinToString(".")
+        val methodName = "${if (typePath.length > 0) "$typePath." else "" }${clazz.structName}.${selectorName.substringBefore('(')}"
         val method = clazz.methods[methodName]!!
         val returnType = clazz.methods[methodName]!!.returnType!!.type
 
