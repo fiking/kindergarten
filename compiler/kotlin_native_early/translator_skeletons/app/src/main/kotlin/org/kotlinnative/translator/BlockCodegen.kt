@@ -33,10 +33,10 @@ abstract class BlockCodegen(val state: TranslationState, val variableManager: Va
     var wasReturnOnTopLevel = false
 
 
-    protected fun evaluateCodeBlock(expr: PsiElement?, startLabel: LLVMLabel? = null, finishLabel: LLVMLabel? = null, scopeDepth: Int = 0, isBlock: Boolean = true) {
+    protected fun evaluateCodeBlock(expr: PsiElement?, startLabel: LLVMLabel? = null, nextIterationLabel: LLVMLabel? = null, breakLabel: LLVMLabel? = null, scopeDepth: Int = 0, isBlock: Boolean = true) {
         codeBuilder.markWithLabel(startLabel)
         if (isBlock) {
-            expressionWalker(expr, scopeDepth)
+            expressionWalker(expr, breakLabel, scopeDepth)
         } else {
 
             var result = evaluateExpression(expr, scopeDepth)!!
@@ -57,17 +57,18 @@ abstract class BlockCodegen(val state: TranslationState, val variableManager: Va
 
             wasReturnOnTopLevel = true
         }
-        codeBuilder.addUnconditionalJump(finishLabel ?: return)
+        codeBuilder.addUnconditionalJump(nextIterationLabel ?: return)
     }
 
-    private fun expressionWalker(expr: PsiElement?, scopeDepth: Int) {
+    private fun expressionWalker(expr: PsiElement?, breakLabel: LLVMLabel?, scopeDepth: Int) {
         when (expr) {
-            is KtBlockExpression -> expressionWalker(expr.firstChild, scopeDepth + 1)
+            is KtBlockExpression -> expressionWalker(expr.firstChild, breakLabel, scopeDepth + 1)
             is KtProperty -> evaluateValExpression(expr, scopeDepth)
             is KtPostfixExpression -> evaluatePostfixExpression(expr, scopeDepth)
             is KtBinaryExpression -> evaluateBinaryExpression(expr, scopeDepth)
             is KtCallExpression -> evaluateCallExpression(expr, scopeDepth)
             is KtDoWhileExpression -> evaluateDoWhileExpression(expr.firstChild, scopeDepth + 1)
+            is KtBreakExpression -> evaluateBreakExpression(expr, breakLabel!!, scopeDepth + 1)
             is KtDotQualifiedExpression -> evaluateDotExpression(expr, scopeDepth)
             is KtWhenExpression -> evaluateWhenExpression(expr, scopeDepth)
             is PsiElement -> evaluateExpression(expr.firstChild, scopeDepth + 1)
@@ -78,7 +79,11 @@ abstract class BlockCodegen(val state: TranslationState, val variableManager: Va
             else -> UnsupportedOperationException()
         }
 
-        expressionWalker(expr.getNextSiblingIgnoringWhitespaceAndComments(), scopeDepth)
+        expressionWalker(expr.getNextSiblingIgnoringWhitespaceAndComments(), breakLabel, scopeDepth)
+    }
+
+    private fun evaluateBreakExpression(expr: KtBreakExpression, breakLabel: LLVMLabel, scopeDepth: Int) {
+        codeBuilder.addUnconditionalJump(breakLabel)
     }
 
     private fun evaluateDoWhileExpression(element: PsiElement, scopeDepth: Int) {
@@ -89,7 +94,7 @@ abstract class BlockCodegen(val state: TranslationState, val variableManager: Va
     fun evaluateExpression(expr: PsiElement?, scopeDepth: Int): LLVMSingleValue? {
         return when (expr) {
             is KtBlockExpression -> {
-                expressionWalker(expr.firstChild, scopeDepth + 1)
+                expressionWalker(expr.firstChild, breakLabel = null, scopeDepth = scopeDepth + 1)
                 return null
             }
             is KtBinaryExpression -> evaluateBinaryExpression(expr, scopeDepth)
@@ -545,11 +550,11 @@ abstract class BlockCodegen(val state: TranslationState, val variableManager: Va
         when (value.type) {
             is LLVMStringType -> if (!(value.type as LLVMStringType).isLoaded) {
                 val newVariable = codeBuilder.getNewVariable(value.type!!, pointer = result.pointer + 1)
-                codeBuilder.allocStackPointedVarAsValue(newVariable)
+                codeBuilder.allocStackVar(newVariable, asValue = true)
                 codeBuilder.copyVariable(result as LLVMVariable, newVariable)
 
                 result = codeBuilder.getNewVariable(argument.type, pointer = newVariable.pointer - 1)
-                codeBuilder.loadVariable(result, newVariable as LLVMVariable)
+                codeBuilder.loadVariable(result, newVariable)
             }
         }
 
@@ -668,8 +673,8 @@ abstract class BlockCodegen(val state: TranslationState, val variableManager: Va
             KtTokens.LTEQ -> firstOp.type!!.operatorLeq(firstNativeOp, secondNativeOp)
             KtTokens.GTEQ -> firstOp.type!!.operatorGeq(firstNativeOp, secondNativeOp)
             KtTokens.EQEQ ->
-                if (firstOp.type is LLVMReferenceType)
-                    if (secondOp.type is LLVMReferenceType) {
+                if (firstOp.type is LLVMReferred)
+                    if (secondOp.type is LLVMReferred) {
                         val firstPointedArgument = receivePointedArgument(firstOp, 1)
                         val secondPointedArgument = receivePointedArgument(secondOp, 1)
                         firstOp.type!!.operatorEq(firstPointedArgument, secondPointedArgument)
@@ -683,8 +688,8 @@ abstract class BlockCodegen(val state: TranslationState, val variableManager: Va
                 firstOp.type!!.operatorEq(firstPointedArgument, secondPointedArgument)
             }
             KtTokens.EXCLEQ -> {
-                if (firstOp.type is LLVMReferenceType)
-                    if (secondOp.type is LLVMReferenceType) {
+                if (firstOp.type is LLVMReferred)
+                    if (secondOp.type is LLVMReferred) {
                         val firstPointedArgument = receivePointedArgument(firstOp, 1)
                         val secondPointedArgument = receivePointedArgument(secondOp, 1)
                         firstOp.type!!.operatorNeq(firstPointedArgument, secondPointedArgument)
@@ -701,7 +706,7 @@ abstract class BlockCodegen(val state: TranslationState, val variableManager: Va
             KtTokens.EQ -> {
                 if (secondOp.type is LLVMNullType) {
                     val result = codeBuilder.getNewVariable(firstOp.type!!, firstOp.pointer)
-                    codeBuilder.allocStackVar(result)
+                    codeBuilder.allocStaticVar(result)
                     result.pointer++
 
                     codeBuilder.storeNull(result)
@@ -771,7 +776,7 @@ abstract class BlockCodegen(val state: TranslationState, val variableManager: Va
         }
 
         codeBuilder.addCondition(conditionResult, bodyLabel, exitLabel)
-        evaluateCodeBlock(bodyExpression, bodyLabel, conditionLabel, scopeDepth + 1)
+        evaluateCodeBlock(bodyExpression, bodyLabel, conditionLabel, exitLabel, scopeDepth + 1)
         codeBuilder.markWithLabel(exitLabel)
 
         return null
@@ -791,7 +796,10 @@ abstract class BlockCodegen(val state: TranslationState, val variableManager: Va
         val kotlinType = state.bindingContext?.get(BindingContext.EXPRESSION_TYPE_INFO, ifExpression)!!.type!!
         val expressionType = LLVMInstanceOfStandardType("type", kotlinType, LLVMVariableScope(), state).type
         val resultVariable = codeBuilder.getNewVariable(expressionType, pointer = 1)
-        codeBuilder.allocStackPointedVarAsValue(resultVariable)
+        when (resultVariable.type) {
+            is LLVMReferenceType -> codeBuilder.allocStaticVar(resultVariable, asValue = true)
+            else -> codeBuilder.allocStackVar(resultVariable, asValue = true)
+        }
         val thenLabel = codeBuilder.getNewLabel(prefix = "if")
         val elseLabel = codeBuilder.getNewLabel(prefix = "if")
         val endLabel = codeBuilder.getNewLabel(prefix = "if")
@@ -819,9 +827,9 @@ abstract class BlockCodegen(val state: TranslationState, val variableManager: Va
 
         codeBuilder.addCondition(conditionResult, thenLabel, if (elseExpression != null) elseLabel else endLabel)
 
-        evaluateCodeBlock(thenExpression, thenLabel, endLabel, scopeDepth + 1)
+        evaluateCodeBlock(thenExpression, thenLabel, endLabel, endLabel, scopeDepth + 1)
         if (elseExpression != null) {
-            evaluateCodeBlock(elseExpression, elseLabel, endLabel, scopeDepth + 1)
+            evaluateCodeBlock(elseExpression, elseLabel, endLabel, endLabel, scopeDepth + 1)
         }
         codeBuilder.markWithLabel(endLabel)
 
@@ -843,7 +851,7 @@ abstract class BlockCodegen(val state: TranslationState, val variableManager: Va
             is LLVMVariable -> {
                 if (assignExpression.pointer < 2) {
                     val allocVar = variableManager.receiveVariable(identifier, assignExpression.type, LLVMRegisterScope(), pointer = 0)
-                    codeBuilder.allocStackVar(allocVar)
+                    codeBuilder.allocStaticVar(allocVar)
                     allocVar.pointer++
                     allocVar.kotlinName = identifier
                     variableManager.addVariable(identifier, allocVar, scopeDepth)
@@ -860,7 +868,7 @@ abstract class BlockCodegen(val state: TranslationState, val variableManager: Va
                         (reference.type as LLVMReferenceType).prefix = "class"
                     }
 
-                    codeBuilder.allocStackVar(reference)
+                    codeBuilder.allocStaticVar(reference)
                     reference.pointer++
 
                     codeBuilder.storeNull(reference)
@@ -887,6 +895,7 @@ abstract class BlockCodegen(val state: TranslationState, val variableManager: Va
 
         when (type) {
             is LLVMReferenceType -> genReferenceReturn(retVar!!)
+            is LLVMNullType,
             is LLVMVoidType -> {
                 codeBuilder.addAnyReturn(LLVMVoidType())
             }
@@ -939,8 +948,11 @@ abstract class BlockCodegen(val state: TranslationState, val variableManager: Va
         val targetExpression = evaluateExpression(whenExpression, scopeDepth + 1)!!
 
         val resultVariable = codeBuilder.getNewVariable(expressionType, pointer = 1)
-        if (expressionType !is LLVMVoidType && expressionType !is LLVMNullType) {
-            codeBuilder.allocStackPointedVarAsValue(resultVariable)
+        when (expressionType) {
+            is LLVMVoidType,
+            is LLVMNullType -> {}
+            is LLVMReferenceType -> codeBuilder.allocStaticVar(resultVariable, asValue = true)
+            else -> codeBuilder.allocStackVar(resultVariable, asValue = true)
         }
 
         var nextLabel = codeBuilder.getNewLabel(prefix = "when_start")
@@ -987,7 +999,7 @@ abstract class BlockCodegen(val state: TranslationState, val variableManager: Va
         when (operator) {
             KtTokens.PLUSPLUS, KtTokens.MINUSMINUS -> {
                 val oldValue = codeBuilder.getNewVariable(firstOp.type, firstOp.pointer)
-                codeBuilder.allocStackPointedVarAsValue(oldValue)
+                codeBuilder.allocStackVar(oldValue, asValue = true)
                 codeBuilder.copyVariable(firstOp, oldValue)
 
                 val llvmExpression = when (operator) {
@@ -1001,6 +1013,18 @@ abstract class BlockCodegen(val state: TranslationState, val variableManager: Va
 
                 codeBuilder.storeVariable(firstOp, resultOp)
                 return oldValue
+            }
+            KtTokens.EXCLEXCL -> {
+                val nullLabel = codeBuilder.getNewLabel(prefix = "nullCheck")
+                val notNullLabel = codeBuilder.getNewLabel(prefix = "nullCheck")
+                val nullCheck = codeBuilder.nullCheck(firstOp)
+                codeBuilder.addCondition(nullCheck, nullLabel, notNullLabel)
+
+                codeBuilder.markWithLabel(nullLabel)
+                codeBuilder.addExceptionCall("KotlinNullPointerException")
+                codeBuilder.addUnconditionalJump(notNullLabel)
+                codeBuilder.markWithLabel(notNullLabel)
+                return firstOp
             }
             else -> throw UnsupportedOperationException()
         }
