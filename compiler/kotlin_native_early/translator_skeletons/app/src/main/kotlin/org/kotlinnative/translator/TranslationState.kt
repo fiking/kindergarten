@@ -53,7 +53,7 @@ fun parseAndAnalyze(sources: List<String>, disposer: Disposable, arm: Boolean = 
             message: String,
             location: CompilerMessageSourceLocation?
         ) {
-            println("[report] $message")
+            System.err.println("[${severity.toString()}] $message")
             hasError = severity.isError || hasError
         }
     }
