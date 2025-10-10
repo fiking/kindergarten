@@ -1,5 +1,6 @@
 package org.kotlinnative.translator.llvm.types
 
+import org.kotlinnative.translator.exceptions.UnimplementedException
 import org.kotlinnative.translator.llvm.LLVMExpression
 import org.kotlinnative.translator.llvm.LLVMSingleValue
 import org.kotlinnative.translator.llvm.LLVMVariable
@@ -68,4 +69,12 @@ class LLVMIntType() : LLVMType() {
 
     override fun operatorDec(firstOp: LLVMSingleValue): LLVMExpression =
         LLVMExpression(LLVMIntType(), "sub nsw i32 $firstOp, 1")
+
+    override fun convertFrom(source: LLVMSingleValue): LLVMExpression = when (source.type!!) {
+        is LLVMBooleanType,
+        is LLVMByteType,
+        is LLVMCharType,
+        is LLVMShortType -> LLVMExpression(LLVMBooleanType(), "  sext ${source.type} $source to i32")
+        else -> throw UnimplementedException()
+    }
 }

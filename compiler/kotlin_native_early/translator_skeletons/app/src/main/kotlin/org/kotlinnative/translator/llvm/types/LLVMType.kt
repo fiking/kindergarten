@@ -26,6 +26,7 @@ abstract class LLVMType() : Cloneable {
 
     fun makeClone() = clone()
 
+    open fun convertFrom(source: LLVMSingleValue): LLVMExpression = throw UnimplementedException()
     abstract fun mangle(): String
 
     abstract val align: Int
