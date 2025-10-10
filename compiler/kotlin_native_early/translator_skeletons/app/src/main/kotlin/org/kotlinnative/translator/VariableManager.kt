@@ -13,8 +13,12 @@ class VariableManager(var globalVariableCollection : HashMap<String, LLVMVariabl
         return fileVariableCollectionTree[variableName]?.peek()?.first ?: globalVariableCollection.get(variableName)
     }
 
+    fun pullOneUpwardLevelVariable(variableName: String) {
+        fileVariableCollectionTree[variableName]?.pop()
+    }
+
     fun pullUpwardsLevel(level: Int) {
-        fileVariableCollectionTree.forEach { s, stack -> while (!stack.empty() && stack.peek().second >= level) stack.pop()  }
+        fileVariableCollectionTree.forEach { s, stack -> while (!stack.empty() && stack.peek().second >= level) stack.pop() }
     }
 
     fun addVariable(name: String, variable: LLVMVariable, level: Int) {

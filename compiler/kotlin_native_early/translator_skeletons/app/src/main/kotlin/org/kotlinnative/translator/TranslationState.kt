@@ -5,10 +5,8 @@ import org.jetbrains.kotlin.analyzer.AnalysisResult
 import org.jetbrains.kotlin.cli.common.CLIConfigurationKeys
 import org.jetbrains.kotlin.cli.common.config.addKotlinSourceRoots
 import org.jetbrains.kotlin.cli.common.messages.AnalyzerWithCompilerReport
-import org.jetbrains.kotlin.cli.common.messages.CompilerMessageLocation
 import org.jetbrains.kotlin.cli.common.messages.CompilerMessageSeverity
 import org.jetbrains.kotlin.cli.common.messages.CompilerMessageSourceLocation
-import org.jetbrains.kotlin.cli.common.messages.GroupingMessageCollector
 import org.jetbrains.kotlin.cli.common.messages.MessageCollector
 import org.jetbrains.kotlin.cli.common.toLogger
 import org.jetbrains.kotlin.cli.jvm.compiler.EnvironmentConfigFiles
@@ -36,7 +34,7 @@ class TranslationState(
     var objects = HashMap<String, ObjectCodegen>()
     var properties = HashMap<String, PropertyCodegen>()
     val codeBuilder = LLVMBuilder(arm)
-    val pointerAllign = if (arm) 4 else 8
+    val pointerAlign = if (arm) 4 else 8
     val pointerSize = if (arm) 4 else 8
     val extensionFunctions = HashMap<String, HashMap<String, FunctionCodegen>>()
 }
@@ -55,8 +53,12 @@ fun parseAndAnalyze(sources: List<String>, disposer: Disposable, arm: Boolean = 
             message: String,
             location: CompilerMessageSourceLocation?
         ) {
+            if (!severity.isError) {
+                return
+            }
+
             System.err.println("[${severity.toString()}]${location?.path} ${location?.line}:${location?.column} $message")
-            hasError = severity.isError || hasError
+            hasError = true
         }
     }
     configuration.put(CLIConfigurationKeys.MESSAGE_COLLECTOR_KEY, messageCollector)

@@ -1,15 +1,12 @@
 package org.kotlinnative.translator
 
-import org.jetbrains.kotlin.descriptors.ClassDescriptor
 import org.jetbrains.kotlin.descriptors.ClassKind
 import org.jetbrains.kotlin.psi.KtClass
 import org.jetbrains.kotlin.psi.KtParameter
 import org.jetbrains.kotlin.resolve.BindingContext
 import org.kotlinnative.translator.exceptions.TranslationException
 import org.kotlinnative.translator.llvm.LLVMBuilder
-import org.kotlinnative.translator.llvm.LLVMClassVariable
 import org.kotlinnative.translator.llvm.types.LLVMReferenceType
-import org.kotlinnative.translator.llvm.types.LLVMType
 
 class ClassCodegen(state: TranslationState,
                    variableManager: VariableManager,
@@ -26,7 +23,7 @@ class ClassCodegen(state: TranslationState,
     override val type: LLVMReferenceType
 
     init {
-        type = LLVMReferenceType(structName, "class", align = state.pointerAllign, size = state.pointerSize, byRef = true)
+        type = LLVMReferenceType(structName, "class", align = state.pointerAlign, size = state.pointerSize, byRef = true)
         if (parentCodegen != null) {
             type.location.addAll(parentCodegen.type.location)
             type.location.add(parentCodegen.structName)
@@ -40,7 +37,7 @@ class ClassCodegen(state: TranslationState,
         generateInnerFields(clazz.declarations)
         calculateTypeSize()
         type.size = size
-        type.align = state.pointerAllign
+        type.align = state.pointerAlign
     }
 
     private fun indexFields(parameters: List<KtParameter>) {

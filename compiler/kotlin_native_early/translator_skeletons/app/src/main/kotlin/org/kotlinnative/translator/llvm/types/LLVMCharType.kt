@@ -28,6 +28,8 @@ class LLVMCharType() : LLVMType() {
     override fun hashCode() =
         mangle().hashCode()
 
+    override fun parseArg(inputArg: String) = inputArg.first().code.toString()
+
     override val align = 1
     override var size: Int = 1
     override fun toString(): String = "i8"

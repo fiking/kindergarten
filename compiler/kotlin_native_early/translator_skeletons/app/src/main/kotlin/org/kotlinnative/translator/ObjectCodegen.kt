@@ -16,7 +16,7 @@ class ObjectCodegen(state: TranslationState,
     StructCodegen(state, variableManager, objectDeclaration, state.bindingContext?.get(BindingContext.CLASS, objectDeclaration) ?: throw TranslationException(), codeBuilder, parentCodegen = parentCodegen) {
     override var size: Int = 0
     override var structName: String = objectDeclaration.name!!
-    override val type: LLVMReferenceType = LLVMReferenceType(structName, "class", align = state.pointerAllign, size = state.pointerSize, byRef = true)
+    override val type: LLVMReferenceType = LLVMReferenceType(structName, "class", align = state.pointerAlign, size = state.pointerSize, byRef = true)
 
     init {
         if (parentCodegen != null) {
@@ -26,7 +26,7 @@ class ObjectCodegen(state: TranslationState,
         generateInnerFields(objectDeclaration.declarations)
         calculateTypeSize()
         type.size = size
-        type.align = state.pointerAllign
+        type.align = state.pointerAlign
     }
 
     override fun prepareForGenerate() {

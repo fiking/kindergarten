@@ -200,7 +200,7 @@ abstract class BlockCodegen(val state: TranslationState, val variableManager: Va
         val isExtension = selectorExpr is KtCallExpression && selectorExpr.getFunctionResolvedCallWithAssert(state.bindingContext!!).extensionReceiver != null
 
         if (isExtension) {
-            return evaluateExtensionExpression(receiverExpr, selectorExpr as KtCallExpression, scopeDepth)
+            return evaluateExtensionExpression(receiverExpr, receiver, selectorExpr as KtCallExpression, scopeDepth)
         }
 
         if (receiver != null) {
@@ -209,11 +209,11 @@ abstract class BlockCodegen(val state: TranslationState, val variableManager: Va
             }
             when (receiver.type) {
                 is LLVMReferenceType -> return evaluateMemberMethodOrField(receiver, selectorExpr.text, scopeDepth, selectorExpr)
-                else -> return evaluateExtensionExpression(receiverExpr, selectorExpr as KtCallExpression, scopeDepth)
+                else -> return evaluateExtensionExpression(receiverExpr, receiver, selectorExpr as KtCallExpression, scopeDepth)
             }
         }
 
-        val clazz = resolveCodegen(receiverExpr) ?: return evaluateExtensionExpression(receiverExpr, selectorExpr as KtCallExpression, scopeDepth)
+        val clazz = resolveCodegen(receiverExpr) ?: return evaluateExtensionExpression(receiverExpr, receiver, selectorExpr as KtCallExpression, scopeDepth)
         return evaluateClassScopedDotExpression(clazz, selectorExpr, scopeDepth, receiver)
     }
 
@@ -243,7 +243,7 @@ abstract class BlockCodegen(val state: TranslationState, val variableManager: Va
         }
     }
 
-    private fun evaluateExtensionExpression(receiver: KtExpression, selector: KtCallExpression, scopeDepth: Int): LLVMSingleValue? {
+    private fun evaluateExtensionExpression(receiver: KtExpression, receiverExpressionArgument: LLVMVariable?, selector: KtCallExpression, scopeDepth: Int): LLVMSingleValue? {
         val receiverType = state.bindingContext?.get(BindingContext.EXPRESSION_TYPE_INFO, receiver)
         val standardType = LLVMMapStandardType(receiverType!!.type!!, state)
         val function = selector.firstChild.firstChild.text
@@ -252,7 +252,7 @@ abstract class BlockCodegen(val state: TranslationState, val variableManager: Va
         val extensionCodegen = state.extensionFunctions[standardType.toString()]?.get("$function$type") ?: throw UnexpectedException(
             "$standardType:$function$type"
         )
-        val receiverExpression = evaluateExpression(receiver, scopeDepth + 1)!!
+        val receiverExpression = receiverExpressionArgument ?: evaluateExpression(receiver, scopeDepth + 1)!!
 
         val typeThisArgument = when (standardType) {
             is LLVMReferenceType -> LLVMVariable("type", standardType, pointer = 1)
@@ -317,7 +317,7 @@ abstract class BlockCodegen(val state: TranslationState, val variableManager: Va
     }
 
     fun evaluateArrayAccessExpression(expr: KtArrayAccessExpression, scope: Int): LLVMSingleValue? {
-        val arrayNameVariable = evaluateReferenceExpression(expr.arrayExpression as KtReferenceExpression, scope) as LLVMVariable
+        val arrayNameVariable = evaluateExpression(expr.arrayExpression, scope) as LLVMVariable
         return when (arrayNameVariable.type) {
             is LLVMReferenceType -> {
                 val callMaker = state.bindingContext?.get(BindingContext.CALL, expr)
@@ -326,9 +326,7 @@ abstract class BlockCodegen(val state: TranslationState, val variableManager: Va
                     Call.CallType.ARRAY_GET_METHOD -> {
                         val arrayActionType = if (callMaker.callType == Call.CallType.ARRAY_SET_METHOD) "set" else "get"
                         val explicitReceiver = callMaker.explicitReceiver as ExpressionReceiver
-                        val expression = explicitReceiver.expression as KtReferenceExpression
-
-                        val receiver = evaluateReferenceExpression(expression, scope)!! as LLVMVariable
+                        val receiver = evaluateExpression(explicitReceiver.expression, scope)!! as LLVMVariable
                         val pureReceiver = downLoadArgument(receiver, 1)
 
                         val targetClassName = (receiver.type as LLVMReferenceType).type

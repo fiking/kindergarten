@@ -182,6 +182,7 @@ abstract class StructCodegen(val state: TranslationState,
         val blockCodegen = object : BlockCodegen(state, variableManager, codeBuilder) {}
         val receiverThis = LLVMVariable("classvariable.this.addr", type, scope = LLVMRegisterScope(), pointer = 1)
         codeBuilder.addComment("field initilizers starts")
+        variableManager.addVariable("this", receiverThis, 2)
         for ((variable, initializer) in initializedFields) {
             val left = blockCodegen.evaluateMemberMethodOrField(receiverThis, variable.label, blockCodegen.topLevel, call = null)!!
             codeBuilder.addComment("left expression")
@@ -190,6 +191,7 @@ abstract class StructCodegen(val state: TranslationState,
             blockCodegen.executeBinaryExpression(KtTokens.EQ, referenceName = null, left = left, right = right)
             codeBuilder.addComment("next initializer")
         }
+        variableManager.pullOneUpwardLevelVariable("this")
         codeBuilder.addComment("field initilizers ends")
     }
 
