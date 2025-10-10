@@ -223,7 +223,12 @@ class LLVMBuilder(val arm: Boolean) {
         localCode.appendLine("; " + comment)
     }
 
-    fun allocStackVarInPointer(target: LLVMVariable) {
+    fun allocStackPointedVarAsValue(target: LLVMVariable) {
         localCode.appendLine("$target = alloca ${target.type}, align ${target.type.align}")
+    }
+
+    fun copyVariable(from: LLVMVariable, to: LLVMVariable) = when (from.type) {
+        is LLVMStringType -> storeString(to, from, 0)
+        else -> copyVariableValue(to, from)
     }
 }
