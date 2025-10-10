@@ -2,10 +2,12 @@ package org.kotlinnative.translator
 
 import com.intellij.psi.PsiElement
 import org.jetbrains.kotlin.descriptors.ClassDescriptor
+import org.jetbrains.kotlin.lexer.KtTokens
 import org.jetbrains.kotlin.psi.KtClass
 import org.jetbrains.kotlin.psi.KtClassOrObject
 import org.jetbrains.kotlin.psi.KtDeclaration
 import org.jetbrains.kotlin.psi.KtEnumEntry
+import org.jetbrains.kotlin.psi.KtExpression
 import org.jetbrains.kotlin.psi.KtNamedDeclaration
 import org.jetbrains.kotlin.psi.KtNamedFunction
 import org.jetbrains.kotlin.psi.KtProperty
@@ -38,6 +40,7 @@ abstract class StructCodegen(open val state: TranslationState,
     val companionFieldsSource = HashMap<String, ObjectCodegen>()
     val enumFields = HashMap<String, LLVMVariable>()
     val constructorFields = ArrayList<LLVMVariable>()
+    val initializedFields = HashMap<LLVMVariable, KtExpression>()
     abstract val type: LLVMReferenceType
     abstract var size: Int
     var methods = HashMap<String, FunctionCodegen>()
@@ -73,11 +76,15 @@ abstract class StructCodegen(open val state: TranslationState,
         for (declaration in declarations) {
             when (declaration) {
                 is KtProperty -> {
-                    val ktType = state.bindingContext?.get(BindingContext.TYPE, declaration.typeReference)!!
+                    val ktType = state.bindingContext?.get(BindingContext.TYPE, declaration.typeReference)
+                        ?: state.bindingContext?.get(BindingContext.VARIABLE, declaration)!!.type
                     val field = resolveType(declaration, ktType)
                     field.offset = offset
                     offset++
 
+                    if ((declaration.initializer != null) && !(this is ObjectCodegen)){
+                        initializedFields.put(field, declaration.initializer!!)
+                    }
                     fields.add(field)
                     fieldsIndex[field.label] = field
                     size += field.type.size
@@ -172,7 +179,14 @@ abstract class StructCodegen(open val state: TranslationState,
                     codeBuilder.storeVariable(classField, argument)
                 }
             }
+        }
+        val blockCodegen = object : BlockCodegen(state, variableManager, codeBuilder) {}
+        val receiverThis = LLVMVariable("classvariable.this.addr", type, scope = LLVMRegisterScope(), pointer = 1)
+        for ((variable, initializer) in initializedFields) {
+            val left = blockCodegen.evaluateMemberMethodOrField(receiverThis, variable.label, blockCodegen.topLevel, call = null)!!
+            val right = blockCodegen.evaluateExpression(initializer, scopeDepth = blockCodegen.topLevel)!!
 
+            blockCodegen.executeBinaryExpression(KtTokens.EQ, referenceName = null, left = left, right = right)
         }
     }
 
