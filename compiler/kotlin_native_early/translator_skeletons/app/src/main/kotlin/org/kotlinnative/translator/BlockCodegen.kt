@@ -88,6 +88,10 @@ abstract class BlockCodegen(val state: TranslationState, val variableManager: Va
 
     fun evaluateExpression(expr: PsiElement?, scopeDepth: Int): LLVMSingleValue? {
         return when (expr) {
+            is KtBlockExpression -> {
+                expressionWalker(expr.firstChild, scopeDepth + 1)
+                return null
+            }
             is KtBinaryExpression -> evaluateBinaryExpression(expr, scopeDepth)
             is KtPostfixExpression -> evaluatePostfixExpression(expr, scopeDepth)
             is KtPrefixExpression -> evaluatePrefixExpression(expr, scopeDepth)
@@ -158,7 +162,7 @@ abstract class BlockCodegen(val state: TranslationState, val variableManager: Va
         val receiveValue = state.bindingContext?.get(BindingContext.COMPILE_TIME_VALUE, expr)
         val type = (receiveValue as TypedCompileTimeConstant).type
         val value = receiveValue.getValue(type) ?: return null
-        val variable = variableManager.receiveVariable(".str", LLVMStringType(value.toString().length), LLVMVariableScope(), pointer = 0)
+        val variable = variableManager.receiveVariable(".str", LLVMStringType(value.toString().length, isLoaded = false), LLVMVariableScope(), pointer = 0)
 
         codeBuilder.addStringConstant(variable, value.toString())
         return variable
@@ -538,6 +542,17 @@ abstract class BlockCodegen(val state: TranslationState, val variableManager: Va
             codeBuilder.loadVariable(result, value as LLVMVariable)
         }
 
+        when (value.type) {
+            is LLVMStringType -> if (!(value.type as LLVMStringType).isLoaded) {
+                val newVariable = codeBuilder.getNewVariable(value.type!!, pointer = result.pointer + 1)
+                codeBuilder.allocStackPointedVarAsValue(newVariable)
+                codeBuilder.copyVariable(result as LLVMVariable, newVariable)
+
+                result = codeBuilder.getNewVariable(argument.type, pointer = newVariable.pointer - 1)
+                codeBuilder.loadVariable(result, newVariable as LLVMVariable)
+            }
+        }
+
         return result
     }
     private fun loadArgsIfRequired(names: List<LLVMSingleValue>, args: List<LLVMVariable>) =
@@ -908,7 +923,7 @@ abstract class BlockCodegen(val state: TranslationState, val variableManager: Va
         while (successExpression is LLVMVariable && successExpression.pointer > 0) {
             successExpression = codeBuilder.loadAndGetVariable(successExpression)
         }
-        if (successExpression != null) {
+        if (successExpression != null && resultVariable.type !is LLVMVoidType && resultVariable.type !is LLVMNullType) {
             codeBuilder.storeVariable(resultVariable, successExpression)
         }
         codeBuilder.addUnconditionalJump(endLabel)
