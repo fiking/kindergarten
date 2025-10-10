@@ -5,6 +5,7 @@ import org.jetbrains.kotlin.analyzer.AnalysisResult
 import org.jetbrains.kotlin.cli.common.CLIConfigurationKeys
 import org.jetbrains.kotlin.cli.common.config.addKotlinSourceRoots
 import org.jetbrains.kotlin.cli.common.messages.AnalyzerWithCompilerReport
+import org.jetbrains.kotlin.cli.common.messages.CompilerMessageLocation
 import org.jetbrains.kotlin.cli.common.messages.CompilerMessageSeverity
 import org.jetbrains.kotlin.cli.common.messages.CompilerMessageSourceLocation
 import org.jetbrains.kotlin.cli.common.messages.GroupingMessageCollector
@@ -40,14 +41,13 @@ class TranslationState(
 
 fun parseAndAnalyze(sources: List<String>, disposer: Disposable, arm: Boolean = false): TranslationState {
     val configuration = CompilerConfiguration()
-    val messageCollector = GroupingMessageCollector(object : MessageCollector {
+    val messageCollector = object : MessageCollector {
         private var hasError = false
         override fun clear() {
             TODO("Not yet implemented")
         }
 
         override fun hasErrors(): Boolean = hasError
-
         override fun report(
             severity: CompilerMessageSeverity,
             message: String,
@@ -56,7 +56,7 @@ fun parseAndAnalyze(sources: List<String>, disposer: Disposable, arm: Boolean = 
             println("[report] $message")
             hasError = severity.isError || hasError
         }
-    }, false)
+    }
     configuration.put(CLIConfigurationKeys.MESSAGE_COLLECTOR_KEY, messageCollector)
     configuration.put(CommonConfigurationKeys.MODULE_NAME, "benchmark")
     configuration.addKotlinSourceRoots(sources)

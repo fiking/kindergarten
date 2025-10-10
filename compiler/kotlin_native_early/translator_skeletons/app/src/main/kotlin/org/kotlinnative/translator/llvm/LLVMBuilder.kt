@@ -5,7 +5,7 @@ import org.kotlinnative.translator.llvm.types.LLVMIntType
 import org.kotlinnative.translator.llvm.types.LLVMStringType
 import org.kotlinnative.translator.llvm.types.LLVMType
 
-class LLVMBuilder(val arm: Boolean) {
+class LLVMBuilder(val arm: Boolean = false) {
     private val POINTER_SIZE = 4
     private var localCode : StringBuilder = StringBuilder()
     private var globalCode: StringBuilder = StringBuilder()
@@ -18,17 +18,8 @@ class LLVMBuilder(val arm: Boolean) {
     private fun initBuilder() {
         val declares = arrayOf(
             "declare void @llvm.memcpy.p0i8.p0i8.i64(i8* nocapture, i8* nocapture readonly, i64, i32, i1)",
-            if (arm) "declare i8* @malloc_static(i32)" else
-                """
-                    declare i8* @malloc(i32) #0
-                    define i8* @malloc_static(i32 %size) #0 {
-                      %1 = alloca i32, align 4
-                      store i32 %size, i32* %1, align 4
-                      %2 = load i32* %1, align 4
-                      %3 = call i8* @malloc(i32 %2)
-                      ret i8* %3
-                    }
-                """)
+            "declare i8* @malloc_static(i32)")
+
         declares.forEach { globalCode.appendLine(it) }
         if (arm) {
             val funcAttributes = """attributes #0 = { nounwind "stack-protector-buffer-size"="8" "target-cpu"="cortex-m3" "target-features"="+hwdiv,+strict-align" }"""
@@ -146,7 +137,7 @@ class LLVMBuilder(val arm: Boolean) {
     fun allocStaticVar(target: LLVMVariable) {
         val allocedVar = getNewVariable(LLVMByteType(), pointer = 1)
         val size = if (target.pointer > 0) POINTER_SIZE else target.type.size
-        val alloc = "$allocedVar = call i8* @${if (arm) "malloc_static" else "malloc"}(i32 $size)"
+        val alloc = "$allocedVar = call i8* @malloc_static(i32 $size)"
         localCode.appendLine(alloc)
         val cast = "$target = bitcast ${allocedVar.getType()} $allocedVar to ${target.getType()}*"
         localCode.appendLine(cast)

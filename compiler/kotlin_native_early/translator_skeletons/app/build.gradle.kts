@@ -16,6 +16,9 @@ plugins {
 repositories {
     // Use Maven Central for resolving dependencies.
     mavenCentral()
+    maven {
+        url = uri("https://jitpack.io")
+    }
 }
 
 dependencies {
@@ -33,6 +36,7 @@ dependencies {
     implementation("org.jetbrains.kotlin:kotlin-compiler:1.9.0")
     implementation("org.jetbrains.kotlin:kotlin-stdlib:1.9.0")
     implementation("org.jetbrains.kotlin:kotlin-runtime:1.0.2")
+    implementation("com.github.jshmrsn:karg:a636b3e")
 }
 
 // Apply a specific Java toolchain to ease working on different environments.
