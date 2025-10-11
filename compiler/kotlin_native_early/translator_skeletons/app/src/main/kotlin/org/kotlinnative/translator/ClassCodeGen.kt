@@ -36,18 +36,6 @@ class ClassCodegen(state: TranslationState,
         type.align = TranslationState.POINTER_ALIGN
     }
 
-    private fun indexFields(parameters: MutableList<KtParameter>) {
-        if (annotation) {
-            return
-        }
-
-        val currentConstructorFields = parameters.mapIndexed { i, it -> resolveType(it, state.bindingContext.get(BindingContext.TYPE, it.typeReference)!!, fields.size + i) }
-        fields.addAll(currentConstructorFields)
-        fieldsIndex.putAll(currentConstructorFields.map { Pair(it.label, it) })
-        primaryConstructorIndex = LLVMType.mangleFunctionArguments(currentConstructorFields)
-        constructorFields.put(primaryConstructorIndex!!, currentConstructorFields)
-    }
-
     override fun prepareForGenerate() {
         val parameterList = clazz.getPrimaryConstructorParameterList()?.parameters ?: listOf()
         indexFields(parameterList as MutableList<KtParameter>)
@@ -79,4 +67,15 @@ class ClassCodegen(state: TranslationState,
         companionObjectCodegen?.generate()
     }
 
+    private fun indexFields(parameters: MutableList<KtParameter>) {
+        if (annotation) {
+            return
+        }
+
+        val currentConstructorFields = parameters.mapIndexed { i, it -> resolveType(it, state.bindingContext.get(BindingContext.TYPE, it.typeReference)!!, fields.size + i) }
+        fields.addAll(currentConstructorFields)
+        fieldsIndex.putAll(currentConstructorFields.map { Pair(it.label, it) })
+        primaryConstructorIndex = LLVMType.mangleFunctionArguments(currentConstructorFields)
+        constructorFields.put(primaryConstructorIndex!!, currentConstructorFields)
+    }
 }
