@@ -4,7 +4,6 @@ import org.jetbrains.kotlin.psi.KtExpression
 import org.jetbrains.kotlin.psi.KtFile
 import org.jetbrains.kotlin.psi.KtNamedFunction
 import org.jetbrains.kotlin.psi.KtParameter
-import org.jetbrains.kotlin.psi.psiUtil.getNextSiblingIgnoringWhitespaceAndComments
 import org.jetbrains.kotlin.psi.psiUtil.isExtensionDeclaration
 import org.jetbrains.kotlin.resolve.BindingContext
 import org.jetbrains.kotlin.resolve.descriptorUtil.fqNameSafe
@@ -20,21 +19,20 @@ import java.util.*
 class FunctionCodegen(state: TranslationState,
                       variableManager: VariableManager,
                       val function: KtNamedFunction,
-                      codeBuilder: LLVMBuilder,
-                      val parentCodegen: StructCodegen? = null) :
+                      codeBuilder: LLVMBuilder) :
     BlockCodegen(state, variableManager, codeBuilder) {
 
     var name: String
     var args = LinkedList<LLVMVariable>()
     val isExtensionDeclaration = function.isExtensionDeclaration()
     var functionNamePrefix = ""
-    val fullName: String
-        get() = functionNamePrefix + name
     val external: Boolean
     val defaultValues: List<KtExpression?>
+    val fullName: String
+        get() = functionNamePrefix + name
 
     init {
-        val descriptor = state.bindingContext?.get(BindingContext.FUNCTION, function)!!
+        val descriptor = state.bindingContext.get(BindingContext.FUNCTION, function)!!
         args.addAll(descriptor.valueParameters.map {
             LLVMInstanceOfStandardType(it?.fqNameSafe?.asString() ?: it.name.toString(), it.type, state = state)
         })
@@ -59,9 +57,8 @@ class FunctionCodegen(state: TranslationState,
         }
 
         defaultValues = mutableListOf()
-        val valueParameters = descriptor.valueParameters
-        for (index in valueParameters.indices) {
-            val parameterDescriptor = valueParameters[index]
+        for (index in descriptor.valueParameters.indices) {
+            val parameterDescriptor = descriptor.valueParameters[index]
             if (parameterDescriptor.declaresDefaultValue()) {
                 val initializer = (parameterDescriptor.source as KotlinSourceElement).psi
                 val defaultValue = (initializer as KtParameter).defaultValue
@@ -70,31 +67,18 @@ class FunctionCodegen(state: TranslationState,
                 defaultValues.add(null)
             }
         }
-
-        val retType = returnType!!.type
-        when (retType) {
-            is LLVMReferenceType -> {
-                if (state.classes.containsKey(retType.type)) {
-                    retType.prefix = "class"
-                }
-
-                retType.byRef = true
-            }
-        }
-        if (retType is LLVMReferenceType && state.classes.containsKey(retType.type)) {
-            retType.prefix = "class"
-        }
     }
 
     fun generate(this_type: LLVMVariable? = null) {
         generateDeclaration(this_type)
+
         if (external) {
             return
         }
 
         codeBuilder.addStartExpression()
         generateLoadArguments()
-        evaluateCodeBlock(function.bodyExpression, scopeDepth = topLevel, isBlock = function.hasBlockBody())
+        evaluateCodeBlock(function.bodyExpression, scopeDepth = topLevelScopeDepth, isBlock = function.hasBlockBody())
 
         if (!wasReturnOnTopLevel)
             codeBuilder.addAnyReturn(returnType!!.type)
@@ -112,20 +96,21 @@ class FunctionCodegen(state: TranslationState,
         }
 
         if (isExtensionDeclaration) {
-            val receiverParameter = state.bindingContext?.get(BindingContext.FUNCTION, function)!!.extensionReceiverParameter!!
+            val receiverParameter = state.bindingContext.get(BindingContext.FUNCTION, function)!!.extensionReceiverParameter!!
             val receiverType = receiverParameter.type
-            val translatorType : LLVMType = LLVMMapStandardType(receiverType, state)
+            val translatorType = LLVMMapStandardType(receiverType, state)
 
             val classVal = when (translatorType) {
                 is LLVMReferenceType -> LLVMVariable("classvariable.this", translatorType, pointer = 1)
                 else -> LLVMVariable("type", translatorType, pointer = 0)
             }
+
             variableManager.addVariable("this", classVal, 0)
             actualArgs.add(classVal)
         }
 
         if (this_type != null) {
-            args.addFirst(this_type)
+            actualArgs.add(this_type)
         }
 
         actualArgs.addAll(args)
@@ -136,17 +121,18 @@ class FunctionCodegen(state: TranslationState,
     private fun generateLoadArguments() {
         args.forEach(fun(it: LLVMVariable) {
             if (it.type is LLVMFunctionType || (it.type is LLVMReferenceType && it.type.byRef)) {
-                variableManager.addVariable(it.label, LLVMVariable(it.label, it.type, it.label, LLVMRegisterScope(), pointer = 1), topLevel)
+                variableManager.addVariable(it.label, LLVMVariable(it.label, it.type, it.label, LLVMRegisterScope(), pointer = 1), topLevelScopeDepth)
                 return
             }
 
             if (it.type !is LLVMReferenceType || it.type.byRef) {
                 val loadVariable = LLVMVariable(it.label, it.type, it.label, LLVMRegisterScope(), pointer = it.pointer)
                 val allocVar = codeBuilder.loadArgument(loadVariable)
-                variableManager.addVariable(it.label, allocVar, topLevel)
+                variableManager.addVariable(it.label, allocVar, topLevelScopeDepth)
             } else {
-                variableManager.addVariable(it.label, LLVMVariable(it.label, it.type, it.label, LLVMRegisterScope(), pointer = 0), topLevel)
+                variableManager.addVariable(it.label, LLVMVariable(it.label, it.type, it.label, LLVMRegisterScope(), pointer = 0), topLevelScopeDepth)
             }
         })
     }
+
 }

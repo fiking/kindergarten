@@ -16,23 +16,23 @@ class ObjectCodegen(state: TranslationState,
     StructCodegen(state, variableManager, objectDeclaration, codeBuilder, parentCodegen) {
     override var size: Int = 0
     override val structName: String = objectDeclaration.fqName?.asString()!!
-    override val type: LLVMReferenceType = LLVMReferenceType(structName, "class", align = TranslationState.pointerAlign, size = TranslationState.pointerSize, byRef = true)
+    override val type: LLVMReferenceType = LLVMReferenceType(structName, "class", align = TranslationState.POINTER_ALIGN, size = TranslationState.POINTER_SIZE, byRef = true)
 
     init {
         primaryConstructorIndex = LLVMType.mangleFunctionArguments(emptyList())
         constructorFields.put(primaryConstructorIndex!!, arrayListOf())
     }
+
     override fun prepareForGenerate() {
         generateInnerFields(objectDeclaration.declarations)
-        calculateTypeSize()
-        type.size = size
-        type.align = TranslationState.pointerAlign
+        type.size = calculateTypeSize()
+        type.align = TranslationState.POINTER_ALIGN
 
         super.prepareForGenerate()
 
         val classInstance = LLVMVariable("object.instance.$structName", type, objectDeclaration.name, LLVMVariableScope(), pointer = 1)
         codeBuilder.addGlobalInitialize(classInstance, fields, initializedFields.map {
-            val type = state.bindingContext?.get(BindingContext.EXPRESSION_TYPE_INFO, it.value)!!.type!!
+            val type = state.bindingContext.get(BindingContext.EXPRESSION_TYPE_INFO, it.value)!!.type!!
             Pair(it.key, state.bindingContext.get(BindingContext.COMPILE_TIME_VALUE, it.value)!!.getValue(type).toString())
         }.toMap(), type)
         variableManager.addGlobalVariable(structName, classInstance)
