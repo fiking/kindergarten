@@ -297,7 +297,7 @@ abstract class StructCodegen(val state: TranslationState,
         size = 0
 
         for (item in fields) {
-            val currentFieldType = if (item.pointer > 0) state.pointerSize else item.type.size
+            val currentFieldType = if (item.pointer > 0) TranslationState.pointerSize else item.type.size
             alignmentRemainder -= (alignmentRemainder % currentFieldType)
             if (alignmentRemainder < currentFieldType) {
                 size += classAlignment

@@ -1,5 +1,6 @@
 package org.kotlinnative.translator.llvm
 
+import org.kotlinnative.translator.TranslationState
 import org.kotlinnative.translator.llvm.types.LLVMBooleanType
 import org.kotlinnative.translator.llvm.types.LLVMByteType
 import org.kotlinnative.translator.llvm.types.LLVMCharType
@@ -9,7 +10,6 @@ import org.kotlinnative.translator.llvm.types.LLVMType
 import org.kotlinnative.translator.llvm.types.LLVMVoidType
 
 class LLVMBuilder(val arm: Boolean = false) {
-    private val POINTER_SIZE = 4
     private var localCode : StringBuilder = StringBuilder()
     private var globalCode: StringBuilder = StringBuilder()
     private var variableCount = 0
@@ -166,7 +166,7 @@ class LLVMBuilder(val arm: Boolean = false) {
     fun allocStaticVar(target: LLVMVariable, asValue: Boolean = false) {
         val allocated = getNewVariable(LLVMCharType(), pointer = 1)
 
-        val size = if (target.pointer > 0) POINTER_SIZE else target.type.size
+        val size = if (target.pointer > 0) TranslationState.pointerSize else target.type.size
         val alloc = "$allocated = call i8* @malloc_heap(i32 $size)"
         localCode.appendln(alloc)
 
@@ -236,7 +236,7 @@ class LLVMBuilder(val arm: Boolean = false) {
     }
 
     fun storeNull(result: LLVMVariable) {
-        val code = "store ${result.getType().dropLast(1)} null, ${result.getType()} $result, align $POINTER_SIZE"
+        val code = "store ${result.getType().dropLast(1)} null, ${result.getType()} $result, align ${TranslationState.pointerAlign}"
         localCode.appendLine(code)
     }
 
@@ -275,8 +275,9 @@ class LLVMBuilder(val arm: Boolean = false) {
         var result = value
 
         while (argument.pointer < result.pointer) {
-            result = getNewVariable(argument.type, pointer = result.pointer - 1)
-            loadVariable(result, value as LLVMVariable)
+            val currentArgument = getNewVariable(result.type!!, pointer = result.pointer - 1)
+            loadVariable(currentArgument, result as LLVMVariable)
+            result = currentArgument
         }
 
         when (value.type) {

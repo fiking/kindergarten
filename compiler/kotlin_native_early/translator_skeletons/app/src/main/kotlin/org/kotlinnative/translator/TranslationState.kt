@@ -27,6 +27,16 @@ class TranslationState(
     val bindingContext: BindingContext?,
     val arm: Boolean
 ) {
+    companion object {
+        var pointerAlign = 4
+        var pointerSize = 4
+    }
+
+    init {
+        pointerAlign = if (arm) 4 else 8
+        pointerSize = if (arm) 4 else 8
+    }
+
     var externalFunctions = HashMap<String, FunctionCodegen>()
     var functions = HashMap<String, FunctionCodegen>()
     val globalVariableCollection = HashMap<String, LLVMVariable>()
@@ -34,8 +44,6 @@ class TranslationState(
     var objects = HashMap<String, ObjectCodegen>()
     var properties = HashMap<String, PropertyCodegen>()
     val codeBuilder = LLVMBuilder(arm)
-    val pointerAlign = if (arm) 4 else 8
-    val pointerSize = if (arm) 4 else 8
     val extensionFunctions = HashMap<String, HashMap<String, FunctionCodegen>>()
 }
 

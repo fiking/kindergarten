@@ -42,10 +42,10 @@ class LLVMIntType() : LLVMType() {
         LLVMExpression(LLVMIntType(), "icmp sge i32 $firstOp, $secondOp")
 
     override fun operatorEq(firstOp: LLVMSingleValue, secondOp: LLVMSingleValue): LLVMExpression =
-        LLVMExpression(LLVMIntType(), "icmp eq i32 $firstOp, $secondOp")
+        LLVMExpression(LLVMBooleanType(), "icmp eq i32" + (if ((firstOp.pointer > 0) || (secondOp.pointer > 0)) "*" else "") + " $firstOp, $secondOp")
 
     override fun operatorNeq(firstOp: LLVMSingleValue, secondOp: LLVMSingleValue): LLVMExpression =
-        LLVMExpression(LLVMIntType(), "icmp ne i32 $firstOp, $secondOp")
+        LLVMExpression(LLVMBooleanType(), "icmp ne i32" + (if ((firstOp.pointer > 0) || (secondOp.pointer > 0)) "*" else "") + " $firstOp, $secondOp")
 
     override fun operatorOr(firstOp: LLVMSingleValue, secondOp: LLVMSingleValue): LLVMExpression =
         LLVMExpression(LLVMIntType(), "or i32 $firstOp, $secondOp")
