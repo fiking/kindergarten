@@ -5,9 +5,10 @@ import org.kotlinnative.translator.llvm.LLVMExpression
 import org.kotlinnative.translator.llvm.LLVMSingleValue
 
 abstract class LLVMType() : Cloneable {
-    open fun operatorPlus(firstOp: LLVMSingleValue, secondOp: LLVMSingleValue) : LLVMExpression = throw UnimplementedException()
-    open fun operatorTimes(firstOp: LLVMSingleValue, secondOp: LLVMSingleValue) : LLVMExpression = throw UnimplementedException()
-    open fun operatorMinus(firstOp: LLVMSingleValue, secondOp: LLVMSingleValue) : LLVMExpression = throw UnimplementedException()
+
+    open fun operatorPlus(firstOp: LLVMSingleValue, secondOp: LLVMSingleValue): LLVMExpression = throw UnimplementedException()
+    open fun operatorTimes(firstOp: LLVMSingleValue, secondOp: LLVMSingleValue): LLVMExpression = throw UnimplementedException()
+    open fun operatorMinus(firstOp: LLVMSingleValue, secondOp: LLVMSingleValue): LLVMExpression = throw UnimplementedException()
     open fun operatorDiv(firstOp: LLVMSingleValue, secondOp: LLVMSingleValue): LLVMExpression = throw UnimplementedException()
     open fun operatorLt(firstOp: LLVMSingleValue, secondOp: LLVMSingleValue): LLVMExpression = throw UnimplementedException()
     open fun operatorGt(firstOp: LLVMSingleValue, secondOp: LLVMSingleValue): LLVMExpression = throw UnimplementedException()
@@ -21,10 +22,20 @@ abstract class LLVMType() : Cloneable {
     open fun operatorShl(firstOp: LLVMSingleValue, secondOp: LLVMSingleValue): LLVMExpression = throw UnimplementedException()
     open fun operatorShr(firstOp: LLVMSingleValue, secondOp: LLVMSingleValue): LLVMExpression = throw UnimplementedException()
     open fun operatorUshr(firstOp: LLVMSingleValue, secondOp: LLVMSingleValue): LLVMExpression = throw UnimplementedException()
+    open fun operatorMod(firstOp: LLVMSingleValue, secondOp: LLVMSingleValue): LLVMExpression = throw UnimplementedException()
     open fun operatorInc(firstOp: LLVMSingleValue): LLVMExpression = throw UnimplementedException()
     open fun operatorDec(firstOp: LLVMSingleValue): LLVMExpression = throw UnimplementedException()
-    open fun operatorMod(firstOp: LLVMSingleValue, secondOp: LLVMSingleValue): LLVMExpression = throw UnimplementedException()
+
     open fun parseArg(inputArg: String) = inputArg
+    open fun convertFrom(source: LLVMSingleValue): LLVMExpression = throw UnimplementedException()
+    open fun mangle(): String = throw UnimplementedException()
+    open fun isPrimitive(): Boolean = false
+    override fun toString() = typename
+
+    abstract val align: Int
+    abstract val typename: String
+    abstract var size: Int
+    abstract val defaultValue: String
 
     companion object {
         fun mangleFunctionArguments(names: List<LLVMSingleValue>) =
@@ -32,26 +43,11 @@ abstract class LLVMType() : Cloneable {
 
         fun mangleFunctionTypes(names: List<LLVMType>) =
             if (names.size > 0) "_${names.joinToString(separator = "_", transform = { it.mangle() })}" else ""
+
+        fun nullOrVoidType(type: LLVMType): Boolean =
+            (type is LLVMNullType) or (type is LLVMVoidType)
+
+        fun isReferredType(type: LLVMType?): Boolean =
+            (type is LLVMNullType) or (type is LLVMReferenceType)
     }
-    open fun convertFrom(source: LLVMSingleValue): LLVMExpression = throw UnimplementedException()
-    abstract fun mangle(): String
-
-    abstract val align: Int
-    abstract val typename: String
-    override fun toString() = typename
-    abstract var size: Int
-    abstract val defaultValue: String
-    open fun isPrimitive(): Boolean = false
-}
-
-fun parseLLVMType(type: String): LLVMType = when(type) {
-    "i64" -> LLVMLongType()
-    "i32" -> LLVMIntType()
-    "i16" -> LLVMShortType()
-    "i8" -> LLVMByteType()
-    "i1" -> LLVMBooleanType()
-    "double" -> LLVMDoubleType()
-    "float" -> LLVMFloatType()
-    "Unit" -> LLVMVoidType()
-    else -> LLVMReferenceType(type)
 }
