@@ -25,8 +25,13 @@ abstract class LLVMType() : Cloneable {
     open fun operatorMod(firstOp: LLVMSingleValue, secondOp: LLVMSingleValue): LLVMExpression = throw UnimplementedException()
     open fun parseArg(inputArg: String) = inputArg
 
-    fun makeClone() = clone()
+    companion object {
+        fun mangleFunctionArguments(names: List<LLVMSingleValue>) =
+            mangleFunctionTypes(names.map { it.type!! })
 
+        fun mangleFunctionTypes(names: List<LLVMType>) =
+            if (names.size > 0) "_${names.joinToString(separator = "_", transform = { it.mangle() })}" else ""
+    }
     open fun convertFrom(source: LLVMSingleValue): LLVMExpression = throw UnimplementedException()
     abstract fun mangle(): String
 

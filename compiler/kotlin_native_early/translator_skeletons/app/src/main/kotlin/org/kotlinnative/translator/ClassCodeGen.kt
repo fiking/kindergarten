@@ -6,7 +6,9 @@ import org.jetbrains.kotlin.psi.KtParameter
 import org.jetbrains.kotlin.resolve.BindingContext
 import org.kotlinnative.translator.exceptions.TranslationException
 import org.kotlinnative.translator.llvm.LLVMBuilder
+import org.kotlinnative.translator.llvm.LLVMVariable
 import org.kotlinnative.translator.llvm.types.LLVMReferenceType
+import org.kotlinnative.translator.llvm.types.LLVMType
 
 class ClassCodegen(state: TranslationState,
                    variableManager: VariableManager,
@@ -33,26 +35,28 @@ class ClassCodegen(state: TranslationState,
         annotation = descriptor?.kind == ClassKind.ANNOTATION_CLASS
         enum = descriptor?.kind == ClassKind.ENUM_CLASS
 
-        indexFields(parameterList)
+        indexFields(parameterList as MutableList<KtParameter>)
         generateInnerFields(clazz.declarations)
         calculateTypeSize()
         type.size = size
         type.align = state.pointerAlign
     }
 
-    private fun indexFields(parameters: List<KtParameter>) {
+    private fun indexFields(parameters: MutableList<KtParameter>) {
         if (annotation) {
             return
         }
-
+        val currentConstructorFields = ArrayList<LLVMVariable>()
         for (field in parameters) {
             val item = resolveType(field, state.bindingContext?.get(BindingContext.TYPE, field.typeReference)!!)
             item.offset = fields.size
 
-            constructorFields.add(item)
+            currentConstructorFields.add(item)
             fields.add(item)
             fieldsIndex[item.label] = item
         }
+        primaryConstructorIndex = LLVMType.mangleFunctionArguments(currentConstructorFields)
+        constructorFields.put(primaryConstructorIndex!!, currentConstructorFields)
     }
     override fun prepareForGenerate() {
         if (annotation) {

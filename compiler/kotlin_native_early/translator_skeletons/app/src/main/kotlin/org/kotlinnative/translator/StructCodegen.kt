@@ -12,6 +12,7 @@ import org.jetbrains.kotlin.psi.KtExpression
 import org.jetbrains.kotlin.psi.KtNamedDeclaration
 import org.jetbrains.kotlin.psi.KtNamedFunction
 import org.jetbrains.kotlin.psi.KtProperty
+import org.jetbrains.kotlin.psi.KtSecondaryConstructor
 import org.jetbrains.kotlin.psi.KtSuperTypeCallEntry
 import org.jetbrains.kotlin.resolve.BindingContext
 import org.jetbrains.kotlin.types.KotlinType
@@ -24,6 +25,7 @@ import org.kotlinnative.translator.llvm.LLVMVariable
 import org.kotlinnative.translator.llvm.LLVMVariableScope
 import org.kotlinnative.translator.llvm.types.LLVMByteType
 import org.kotlinnative.translator.llvm.types.LLVMReferenceType
+import org.kotlinnative.translator.llvm.types.LLVMType
 import org.kotlinnative.translator.llvm.types.LLVMVoidType
 
 abstract class StructCodegen(val state: TranslationState,
@@ -36,7 +38,8 @@ abstract class StructCodegen(val state: TranslationState,
     val fieldsIndex = HashMap<String, LLVMClassVariable>()
     val nestedClasses = HashMap<String, ClassCodegen>()
     val enumFields = HashMap<String, LLVMVariable>()
-    val constructorFields = ArrayList<LLVMVariable>()
+    val constructorFields = HashMap<String, ArrayList<LLVMVariable>>()
+    var primaryConstructorIndex: String? = null
     val initializedFields = HashMap<LLVMVariable, KtExpression>()
     abstract val type: LLVMReferenceType
     abstract var size: Int
@@ -61,6 +64,9 @@ abstract class StructCodegen(val state: TranslationState,
     open fun generate() {
         generateEnumFields()
         generatePrimaryConstructor()
+        for (secondaryConstructor in classOrObject.getSecondaryConstructors()) {
+            generateSecondaryConstructor(secondaryConstructor)
+        }
 
         val classVal = LLVMVariable("classvariable.this", type, pointer = if (type.isPrimitive()) 0 else 1)
         variableManager.addVariable("this", classVal, 0)
@@ -115,7 +121,7 @@ abstract class StructCodegen(val state: TranslationState,
             val field = codeBuilder.getNewVariable(type, scope = LLVMVariableScope())
             val enumField = enumFields[name]!!
 
-            codeBuilder.defineGlobalVariable(field, codeBuilder.makeStructInitializer(constructorFields, arguments))
+            codeBuilder.defineGlobalVariable(field, codeBuilder.makeStructInitializer(constructorFields[primaryConstructorIndex]!!, arguments))
             codeBuilder.defineGlobalVariable(LLVMVariable(enumField.label, enumField.type, enumField.kotlinName, enumField.scope, enumField.pointer - 1), "$field")
         }
     }
@@ -126,24 +132,55 @@ abstract class StructCodegen(val state: TranslationState,
 
     private fun generatePrimaryConstructor() {
         val argFields = ArrayList<LLVMVariable>()
-        val refType = type.makeClone() as LLVMReferenceType
-        refType.addParam("sret")
-        refType.byRef = true
 
         val classVal = LLVMVariable("classvariable.this", type, pointer = 1)
         variableManager.addVariable("this", classVal, 0)
 
         argFields.add(classVal)
-        argFields.addAll(constructorFields)
+        argFields.addAll(constructorFields[primaryConstructorIndex]!!)
 
-        codeBuilder.addLLVMCode(LLVMFunctionDescriptor(fullName, argFields,
-            LLVMVoidType(), arm = state.arm))
+        codeBuilder.addLLVMCode(LLVMFunctionDescriptor(fullName + primaryConstructorIndex, argFields, LLVMVoidType(), arm = state.arm))
 
         codeBuilder.addStartExpression()
         generateLoadArguments(classVal)
         generateAssignments()
-        generateReturn()
+        generateReturn(LLVMVariable("classvariable.this.addr", type, scope = LLVMRegisterScope(), pointer = 1))
         genClassInitializers()
+        codeBuilder.addAnyReturn(LLVMVoidType())
+        codeBuilder.addEndExpression()
+    }
+
+    private fun generateSecondaryConstructor(secondaryConstructor: KtSecondaryConstructor) {
+        val thisCall = secondaryConstructor.getDelegationCall().calleeExpression
+        val descriptor = state.bindingContext?.get(BindingContext.CONSTRUCTOR, secondaryConstructor)
+
+        val argFields = ArrayList<LLVMVariable>()
+
+        val classVal = LLVMVariable("classvariable.this", type, pointer = 1)
+        variableManager.addVariable("this", classVal, 0)
+
+        val secondaryConstructorArguments = descriptor!!.valueParameters.map {
+            LLVMInstanceOfStandardType(it.name.toString(), it.type, state = state)
+        }
+
+        argFields.add(classVal)
+        argFields.addAll(secondaryConstructorArguments)
+        val currentConstructorIndex = LLVMType.mangleFunctionArguments(secondaryConstructorArguments)
+        constructorFields.put(currentConstructorIndex, argFields)
+        codeBuilder.addLLVMCode(LLVMFunctionDescriptor(fullName + currentConstructorIndex, argFields, LLVMVoidType(), arm = state.arm))
+
+        codeBuilder.addStartExpression()
+
+        for (variable in secondaryConstructorArguments) {
+            variableManager.addVariable(variable.label, variable, 2)
+        }
+
+        val blockCodegen = object : BlockCodegen(state, variableManager, codeBuilder) {}
+        val mainConstructorThis = blockCodegen.evaluateConstructorDelegationReferenceExpression(thisCall!!, this, secondaryConstructorArguments, 1) as LLVMVariable
+        variableManager.addVariable("this", mainConstructorThis, 0)
+
+        blockCodegen.evaluateCodeBlock(secondaryConstructor.bodyExpression, scopeDepth = 1)
+        generateReturn(codeBuilder.downLoadArgument(variableManager.get("this")!!, 1) as LLVMVariable)
         codeBuilder.addAnyReturn(LLVMVoidType())
         codeBuilder.addEndExpression()
     }
@@ -154,7 +191,7 @@ abstract class StructCodegen(val state: TranslationState,
             LLVMRegisterScope(), pointer = 0)
         codeBuilder.loadArgument(thisVariable, false)
 
-        constructorFields.forEach {
+        constructorFields[primaryConstructorIndex]!!.forEach {
             if (it.type !is LLVMReferenceType) {
                 val loadVariable = LLVMVariable(it.label, it.type, it.label, LLVMRegisterScope())
                 codeBuilder.loadArgument(loadVariable)
@@ -163,7 +200,7 @@ abstract class StructCodegen(val state: TranslationState,
     }
 
     private fun generateAssignments() {
-        constructorFields.forEach {
+        constructorFields[primaryConstructorIndex]!!.forEach {
             when (it.type) {
                 is LLVMReferenceType -> {
                     val classField = codeBuilder.getNewVariable(it.type, pointer = it.pointer + 1)
@@ -195,9 +232,8 @@ abstract class StructCodegen(val state: TranslationState,
         codeBuilder.addComment("field initilizers ends")
     }
 
-    private fun generateReturn() {
+    private fun generateReturn(src: LLVMVariable) {
         val dst = LLVMVariable("classvariable.this", type, scope = LLVMRegisterScope(), pointer = 1)
-        val src = LLVMVariable("classvariable.this.addr", type, scope = LLVMRegisterScope(), pointer = 1)
 
         val castedDst = codeBuilder.bitcast(dst, LLVMVariable("", LLVMByteType(), pointer = 1))
         val castedSrc = codeBuilder.bitcast(src, LLVMVariable("", LLVMByteType(), pointer = 1))
