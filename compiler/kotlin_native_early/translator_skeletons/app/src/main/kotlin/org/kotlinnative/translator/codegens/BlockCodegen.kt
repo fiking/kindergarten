@@ -91,7 +91,6 @@ abstract class BlockCodegen(val state: TranslationState,
 
     val topLevelScopeDepth = 2
     var returnType: LLVMVariable? = null
-    var wasReturnOnTopLevel = false
 
     fun evaluateCodeBlock(expr: PsiElement?,
                           startLabel: LLVMLabel? = null,
@@ -116,8 +115,6 @@ abstract class BlockCodegen(val state: TranslationState,
                 }
                 else -> codeBuilder.addAnyReturn(result.type, result.toString())
             }
-
-            wasReturnOnTopLevel = true
         }
         codeBuilder.addUnconditionalJump(nextIterationLabel ?: return)
     }
@@ -648,9 +645,10 @@ abstract class BlockCodegen(val state: TranslationState,
 
         val functionDescriptor = resolvedCall!!.candidateDescriptor
         val targetFunctionName = functionDescriptor.fqNameSafe.convertToNativeName()
+        val externalFunctionName = functionDescriptor.name.asString()
         val arguments = resolvedCall.valueArguments.toSortedMap(compareBy { it.index }).values
 
-        val external = state.externalFunctions.containsKey(targetFunctionName)
+        val external = state.externalFunctions.containsKey(externalFunctionName)
         val functionArguments = functionDescriptor.valueParameters.map { it -> it.type }.map {
             LLVMMapStandardType(
                 it,
@@ -659,16 +657,11 @@ abstract class BlockCodegen(val state: TranslationState,
         }
         val function = "$targetFunctionName${if (!external) LLVMType.Companion.mangleFunctionTypes(functionArguments) else ""}"
 
-        if (function in state.functions || function in state.externalFunctions) {
-            val descriptor = state.functions[function] ?: state.externalFunctions[function]!!
+        if (function in state.functions || externalFunctionName in state.externalFunctions) {
+            val descriptor = state.functions[function] ?: state.externalFunctions[externalFunctionName]!!
             names = parseArgumentsWithDefaultValues(arguments, descriptor.defaultValues, scopeDepth)
             val args = codeBuilder.loadArgsIfRequired(names, descriptor.args)
-            return evaluateFunctionCallExpression(
-                LLVMVariable(
-                    function,
-                    descriptor.returnType!!.type,
-                    scope = LLVMVariableScope()
-                ), args)
+            return evaluateFunctionCallExpression(LLVMVariable(descriptor.name, descriptor.returnType!!.type, scope = LLVMVariableScope()), args)
         }
 
         if (targetFunctionName in state.classes || classScope?.structName == targetFunctionName) {
@@ -1319,9 +1312,6 @@ abstract class BlockCodegen(val state: TranslationState,
                 val retNativeValue = codeBuilder.receiveNativeValue(retVar!!)
                 codeBuilder.addReturnOperator(retNativeValue)
             }
-        }
-        if (scopeDepth == topLevelScopeDepth + 2) {
-            wasReturnOnTopLevel = true
         }
         return null
     }

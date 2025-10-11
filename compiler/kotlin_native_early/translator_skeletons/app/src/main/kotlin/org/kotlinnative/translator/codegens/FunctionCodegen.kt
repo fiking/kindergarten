@@ -17,6 +17,7 @@ import org.kotlinnative.translator.llvm.LLVMMapStandardType
 import org.kotlinnative.translator.llvm.LLVMRegisterScope
 import org.kotlinnative.translator.llvm.LLVMVariable
 import org.kotlinnative.translator.llvm.addAfterIfNotEmpty
+import org.kotlinnative.translator.llvm.convertToNativeName
 import org.kotlinnative.translator.llvm.types.LLVMFunctionType
 import org.kotlinnative.translator.llvm.types.LLVMReferenceType
 import org.kotlinnative.translator.llvm.types.LLVMType
@@ -57,7 +58,7 @@ class FunctionCodegen(state: TranslationState,
             returnType!!.pointer = 2
         }
         external = descriptor.isExternal
-        name = "${function.fqName}${if (!external) LLVMType.Companion.mangleFunctionArguments(args) else ""}"
+        name = if (external) function.name!! else function.fqName!!.convertToNativeName() +  LLVMType.mangleFunctionArguments(args)
 
         if (isExtensionDeclaration) {
             name = "${function.name}${if (!external) LLVMType.Companion.mangleFunctionArguments(args) else ""}"
@@ -95,8 +96,9 @@ class FunctionCodegen(state: TranslationState,
         generateLoadArguments()
         evaluateCodeBlock(function.bodyExpression, scopeDepth = topLevelScopeDepth, isBlock = function.hasBlockBody())
 
-        if (!wasReturnOnTopLevel)
-            codeBuilder.addAnyReturn(returnType!!.type)
+        if (returnType?.type is LLVMVoidType){
+            codeBuilder.addAnyReturn(LLVMVoidType())
+        }
 
         codeBuilder.addEndExpression()
     }

@@ -36,12 +36,12 @@ private constructor
 ) {
     var externalFunctions = HashMap<String, FunctionCodegen>()
     var functions = HashMap<String, FunctionCodegen>()
-    val globalVariableCollection = HashMap<String, LLVMVariable>()
     var classes = HashMap<String, ClassCodegen>()
     var objects = HashMap<String, ObjectCodegen>()
     var properties = HashMap<String, PropertyCodegen>()
     val codeBuilder = LLVMBuilder(arm)
     val extensionFunctions = HashMap<String, HashMap<String, FunctionCodegen>>()
+    val globalVariableCollection = HashMap<String, LLVMVariable>()
 
     init {
         POINTER_ALIGN = if (arm) 4 else 8
