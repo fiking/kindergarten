@@ -35,7 +35,6 @@ abstract class StructCodegen(val state: TranslationState,
                              val variableManager: VariableManager,
                              val classOrObject: KtClassOrObject,
                              val codeBuilder: LLVMBuilder,
-                             val packageName: String,
                              val parentCodegen: StructCodegen? = null) {
     val fields = ArrayList<LLVMVariable>()
     val fieldsIndex = HashMap<String, LLVMClassVariable>()
@@ -55,7 +54,7 @@ abstract class StructCodegen(val state: TranslationState,
         generateStruct()
 
         for (declaration in classOrObject.declarations.filter { it is KtNamedFunction }) {
-            val function = FunctionCodegen(state, variableManager, declaration as KtNamedFunction, codeBuilder, packageName, this)
+            val function = FunctionCodegen(state, variableManager, declaration as KtNamedFunction, codeBuilder, this)
             methods.put(function.name, function)
         }
     }
@@ -67,7 +66,7 @@ abstract class StructCodegen(val state: TranslationState,
             generateSecondaryConstructor(secondaryConstructor)
         }
 
-        val classVal = LLVMVariable("classvariable.this", type, pointer = if (type.isPrimitive()) 0 else 1)
+        val classVal = LLVMVariable("classvariable.this", type, pointer = if (type.isPrimitive) 0 else 1)
         variableManager.addVariable("this", classVal, 0)
         for (function in methods.values) {
             function.generate(classVal)
@@ -102,8 +101,7 @@ abstract class StructCodegen(val state: TranslationState,
                     nestedClasses.put(declaration.fqName!!.asString(),
                         ClassCodegen(state,
                             VariableManager(state.globalVariableCollection),
-                            declaration, codeBuilder,
-                            packageName, this))
+                            declaration, codeBuilder, this))
                 }
             }
         }
@@ -179,7 +177,7 @@ abstract class StructCodegen(val state: TranslationState,
         variableManager.addVariable("this", mainConstructorThis, 0)
 
         blockCodegen.evaluateCodeBlock(secondaryConstructor.bodyExpression, scopeDepth = 1)
-        generateReturn(codeBuilder.downLoadArgument(variableManager.get("this")!!, 1) as LLVMVariable)
+        generateReturn(codeBuilder.downLoadArgument(variableManager["this"]!!, 1) as LLVMVariable)
         codeBuilder.addAnyReturn(LLVMVoidType())
         codeBuilder.addEndExpression()
     }

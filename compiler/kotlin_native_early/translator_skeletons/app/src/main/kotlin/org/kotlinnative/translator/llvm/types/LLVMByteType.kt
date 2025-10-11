@@ -4,26 +4,25 @@ import org.kotlinnative.translator.llvm.LLVMExpression
 import org.kotlinnative.translator.llvm.LLVMSingleValue
 
 class LLVMByteType() : LLVMType() {
-    override fun toString(): String = "i8"
 
     override val align = 1
     override var size: Int = 1
-    override val defaultValue = "0"
-    override fun isPrimitive() = true
-    override fun mangle() = "Byte"
+    override val mangle = "Byte"
     override val typename = "i8"
+    override val defaultValue = "0"
+    override val isPrimitive = true
 
     override fun operatorLt(firstOp: LLVMSingleValue, secondOp: LLVMSingleValue): LLVMExpression =
-        LLVMExpression(LLVMIntType(), "icmp slt i8 $firstOp, $secondOp")
+        LLVMExpression(LLVMBooleanType(), "icmp slt i8 $firstOp, $secondOp")
 
     override fun operatorGt(firstOp: LLVMSingleValue, secondOp: LLVMSingleValue): LLVMExpression =
-        LLVMExpression(LLVMIntType(), "icmp sgt i8 $firstOp, $secondOp")
+        LLVMExpression(LLVMBooleanType(), "icmp sgt i8 $firstOp, $secondOp")
 
     override fun operatorLeq(firstOp: LLVMSingleValue, secondOp: LLVMSingleValue): LLVMExpression =
-        LLVMExpression(LLVMIntType(), "icmp sle i8 $firstOp, $secondOp")
+        LLVMExpression(LLVMBooleanType(), "icmp sle i8 $firstOp, $secondOp")
 
     override fun operatorGeq(firstOp: LLVMSingleValue, secondOp: LLVMSingleValue): LLVMExpression =
-        LLVMExpression(LLVMIntType(), "icmp sge i8 $firstOp, $secondOp")
+        LLVMExpression(LLVMBooleanType(), "icmp sge i8 $firstOp, $secondOp")
 
     override fun operatorEq(firstOp: LLVMSingleValue, secondOp: LLVMSingleValue): LLVMExpression =
         LLVMExpression(LLVMBooleanType(), "icmp eq i8" + (if ((firstOp.pointer > 0) || (secondOp.pointer > 0)) "*" else "") + " $firstOp, $secondOp")
@@ -34,9 +33,10 @@ class LLVMByteType() : LLVMType() {
     override fun operatorMod(firstOp: LLVMSingleValue, secondOp: LLVMSingleValue): LLVMExpression =
         LLVMExpression(LLVMByteType(), "srem i8 $firstOp, $secondOp")
 
-    override fun equals(other: Any?): Boolean {
-        return other is LLVMByteType
-    }
+    override fun equals(other: Any?) =
+        other is LLVMByteType
+
     override fun hashCode() =
-        mangle().hashCode()
+        mangle.hashCode()
+
 }

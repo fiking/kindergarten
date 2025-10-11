@@ -257,7 +257,7 @@ abstract class BlockCodegen(val state: TranslationState, val variableManager: Va
         val names = parseArgList(selector, scopeDepth)
         val type = LLVMType.mangleFunctionArguments(names)
 
-        val constructedFunctionName = standardType.mangle() + nameWithoutMangling.addBeforeIfNotEmpty(".") + type
+        val constructedFunctionName = standardType.mangle + nameWithoutMangling.addBeforeIfNotEmpty(".") + type
         val targetExtension = state.extensionFunctions[standardType.toString()]
 
         val extensionCodegen = targetExtension?.get(packageNameFirst.addAfterIfNotEmpty(".") + constructedFunctionName) ?:
@@ -365,7 +365,7 @@ abstract class BlockCodegen(val state: TranslationState, val variableManager: Va
             else -> {
                 val arrayIndex = evaluateConstantExpression(expr.indexExpressions.first() as KtConstantExpression)
                 val arrayReceivedVariable = codeBuilder.loadAndGetVariable(arrayNameVariable)
-                val arrayElementType = (arrayNameVariable.type as LLVMArray).basicType()
+                val arrayElementType = (arrayNameVariable.type as LLVMArray).arrayElementType
                 val indexVariable = codeBuilder.getNewVariable(arrayElementType, pointer = 1)
                 codeBuilder.loadVariableOffset(indexVariable, arrayReceivedVariable, arrayIndex)
                 indexVariable
@@ -672,7 +672,7 @@ abstract class BlockCodegen(val state: TranslationState, val variableManager: Va
                 codeBuilder.addExceptionCall("KotlinNullPointerException")
                 codeBuilder.addUnconditionalJump(notNullLabel)
                 codeBuilder.markWithLabel(notNullLabel)
-                if (firstOp.type.isPrimitive()) {
+                if (firstOp.type.isPrimitive) {
                     result = codeBuilder.downLoadArgument(firstOp, 0) as LLVMVariable
                 }
                 return result
@@ -821,7 +821,7 @@ abstract class BlockCodegen(val state: TranslationState, val variableManager: Va
 
                 val result = firstOp as LLVMVariable
                 val sourceArgument: LLVMSingleValue
-                if ((firstOp.pointer == 2) && secondOp.type!!.isPrimitive() && (secondOp.pointer == 0)) {
+                if ((firstOp.pointer == 2) && secondOp.type!!.isPrimitive && (secondOp.pointer == 0)) {
                     sourceArgument = codeBuilder.getNewVariable(secondOp.type!!, 1)
                     codeBuilder.allocStaticVar(sourceArgument, asValue = true)
                     codeBuilder.storeVariable(sourceArgument, secondOp)

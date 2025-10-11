@@ -6,32 +6,32 @@ import org.kotlinnative.translator.llvm.LLVMInstanceOfStandardType
 import org.kotlinnative.translator.llvm.LLVMVariable
 
 class LLVMFunctionType(type: KotlinType, state: TranslationState) : LLVMType() {
+
+    override val defaultValue = ""
     override val align: Int = 4
     override var size: Int = 4
-    override val defaultValue: String = ""
+    override val mangle: String
     override val typename = "FunctionType"
 
-    val arguments : List<LLVMVariable>
-    val returnType : LLVMVariable
+    val arguments: List<LLVMVariable>
+    val returnType: LLVMVariable
 
     init {
         val types = type.arguments.map { LLVMInstanceOfStandardType("", it.type, state = state) }.toList()
         returnType = types.last()
         arguments = types.dropLast(1)
+        mangle = "F.${LLVMType.mangleFunctionArguments(arguments)}.EF"
     }
 
-    override fun mangle() =
-        "F.${LLVMType.mangleFunctionArguments(arguments)}.EF"
+    fun mangleArgs() = LLVMType.mangleFunctionArguments(arguments)
 
-    fun mangleArgs(): String =
-        if (arguments.size > 0) LLVMType.mangleFunctionArguments(arguments) else ""
+    override fun toString() =
+        "${returnType.type} (${arguments.map { it.getType() }.joinToString()})"
 
-    override fun toString(): String = "${returnType.type} (${arguments.joinToString { it.getType() }})"
+    override fun equals(other: Any?) =
+        (other is LLVMFunctionType) && (mangle == other.mangle)
 
     override fun hashCode() =
-        mangle().hashCode()
+        mangle.hashCode()
 
-    override fun equals(other: Any?): Boolean {
-        return (other is LLVMFunctionType) && (mangle() == other.mangle())
-    }
 }

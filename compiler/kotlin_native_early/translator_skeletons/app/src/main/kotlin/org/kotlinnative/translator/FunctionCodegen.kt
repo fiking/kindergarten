@@ -21,7 +21,6 @@ class FunctionCodegen(state: TranslationState,
                       variableManager: VariableManager,
                       val function: KtNamedFunction,
                       codeBuilder: LLVMBuilder,
-                      val packageName: String,
                       val parentCodegen: StructCodegen? = null) :
     BlockCodegen(state, variableManager, codeBuilder) {
 
@@ -52,7 +51,7 @@ class FunctionCodegen(state: TranslationState,
             val receiverType = descriptor.extensionReceiverParameter!!.type
             val translatorType = LLVMMapStandardType(receiverType, state)
             val packageName = (function.containingFile as KtFile).packageFqName.asString()
-            functionNamePrefix = packageName.addAfterIfNotEmpty(".") + translatorType.mangle() + "."
+            functionNamePrefix = packageName.addAfterIfNotEmpty(".") + translatorType.mangle + "."
 
             val extensionFunctionsOfThisType = state.extensionFunctions.getOrDefault(translatorType.toString(), HashMap())
             extensionFunctionsOfThisType.put(fullName, this)
