@@ -31,7 +31,6 @@ import org.kotlinnative.translator.llvm.types.LLVMVoidType
 abstract class StructCodegen(val state: TranslationState,
                              val variableManager: VariableManager,
                              val classOrObject: KtClassOrObject,
-                             val classDescriptor: ClassDescriptor,
                              val codeBuilder: LLVMBuilder,
                              val parentCodegen: StructCodegen? = null) {
     val fields = ArrayList<LLVMVariable>()

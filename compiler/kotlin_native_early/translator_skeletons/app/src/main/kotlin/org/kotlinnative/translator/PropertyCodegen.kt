@@ -23,6 +23,4 @@ class PropertyCodegen(val state: TranslationState, val variableManager: Variable
             variable.pointer++
         }
     }
-
-
 }

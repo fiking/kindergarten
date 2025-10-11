@@ -22,11 +22,7 @@ import org.jetbrains.kotlin.resolve.BindingContext
 import org.kotlinnative.translator.llvm.LLVMBuilder
 import org.kotlinnative.translator.llvm.LLVMVariable
 
-class TranslationState(
-    val environment: KotlinCoreEnvironment,
-    val bindingContext: BindingContext?,
-    val arm: Boolean
-) {
+class TranslationState(val environment: KotlinCoreEnvironment, val bindingContext: BindingContext?, arm: Boolean) {
     companion object {
         var pointerAlign = 4
         var pointerSize = 4

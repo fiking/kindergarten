@@ -148,11 +148,6 @@ class LLVMBuilder(val arm: Boolean = false) {
         }
     }
 
-    fun addConstant(allocVariable: LLVMVariable, constantValue: LLVMConstant) {
-        localCode.appendLine("$allocVariable = alloca ${allocVariable.type}, align ${allocVariable.type.align}")
-        localCode.appendLine("store ${allocVariable.type} $constantValue, ${allocVariable.getType()} $allocVariable, align ${allocVariable.type.align}")
-    }
-
     fun createClass(name: String, fields: List<LLVMVariable>) {
         val code = "@class.$name = type { ${ fields.map { it.type }.joinToString() } }"
         globalCode.appendLine(code)
@@ -168,10 +163,10 @@ class LLVMBuilder(val arm: Boolean = false) {
 
         val size = if (target.pointer > 0) TranslationState.pointerSize else target.type.size
         val alloc = "$allocated = call i8* @malloc_heap(i32 $size)"
-        localCode.appendln(alloc)
+        localCode.appendLine(alloc)
 
         val cast = "$target = bitcast ${allocated.getType()} $allocated to ${if (asValue) target.type.toString() else target.getType()}*"
-        localCode.appendln(cast)
+        localCode.appendLine(cast)
     }
 
     fun bitcast(src: LLVMVariable, llvmType: LLVMVariable) : LLVMVariable {
@@ -296,4 +291,9 @@ class LLVMBuilder(val arm: Boolean = false) {
 
     fun downLoadArgument(value: LLVMSingleValue, pointer: Int): LLVMSingleValue =
         loadArgumentIfRequired(value, LLVMVariable("", value.type!!, pointer = pointer))
+
+    fun loadArgsIfRequired(names: List<LLVMSingleValue>, args: List<LLVMVariable>) =
+        names.mapIndexed(fun(i: Int, value: LLVMSingleValue): LLVMSingleValue {
+            return loadArgumentIfRequired(value, args[i])
+        }).toList()
 }
