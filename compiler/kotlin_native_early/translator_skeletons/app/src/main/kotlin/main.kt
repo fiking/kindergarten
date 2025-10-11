@@ -12,22 +12,22 @@ fun main(args: Array<String>) {
 
     val stdlib = mutableListOf<String>()
     if (arguments.includeDir != null) {
-        stdlib.addAll(File(arguments.includeDir).listFiles().map { it.absolutePath })
+        val libraryFile = File(arguments.includeDir).walk().filter { !it.isDirectory }.map { it.absolutePath }
+        stdlib.addAll(libraryFile)
         analyzedFiles.addAll(stdlib)
     }
 
     analyzedFiles.addAll(arguments.sources)
 
-    val state = parseAndAnalyze(analyzedFiles, disposer, arguments.arm ?: false)
+    val state = parseAndAnalyze(analyzedFiles, disposer, arguments.mainClass, arguments.arm ?: false)
     val files = state.environment.getSourceFiles()
     val code = ProjectTranslator(files, state).generateCode()
 
     if (arguments.output == null) {
         println(code)
-        return
+    } else {
+        val output = File(arguments.output)
+        output.writeText(code)
     }
-
-    val output = File(arguments.output)
-    output.writeText(code)
 }
 

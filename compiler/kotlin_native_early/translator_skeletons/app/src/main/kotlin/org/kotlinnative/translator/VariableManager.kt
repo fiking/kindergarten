@@ -34,7 +34,6 @@ class VariableManager(var globalVariableCollection : HashMap<String, LLVMVariabl
     fun receiveVariable(name: String, type: LLVMType, scope: LLVMScope, pointer: Int): LLVMVariable {
         val ourVersion = variableVersion.getOrDefault(name, 0) + 1
         variableVersion.put(name, ourVersion)
-
         return LLVMVariable("%managed.$name.$ourVersion", type, name, scope, pointer)
     }
 }

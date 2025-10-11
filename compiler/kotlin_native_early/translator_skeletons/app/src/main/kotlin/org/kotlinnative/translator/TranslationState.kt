@@ -19,10 +19,11 @@ import org.jetbrains.kotlin.config.CompilerConfiguration
 import org.jetbrains.kotlin.config.JVMConfigurationKeys
 import org.jetbrains.kotlin.ir.backend.jvm.jvmResolveLibraries
 import org.jetbrains.kotlin.resolve.BindingContext
+import org.kotlinnative.translator.exceptions.TranslationException
 import org.kotlinnative.translator.llvm.LLVMBuilder
 import org.kotlinnative.translator.llvm.LLVMVariable
 
-class TranslationState(val environment: KotlinCoreEnvironment, val bindingContext: BindingContext?, arm: Boolean) {
+class TranslationState(val environment: KotlinCoreEnvironment, val bindingContext: BindingContext, val mainFunction: String, arm: Boolean) {
     companion object {
         var pointerAlign = 4
         var pointerSize = 4
@@ -40,11 +41,10 @@ class TranslationState(val environment: KotlinCoreEnvironment, val bindingContex
     var objects = HashMap<String, ObjectCodegen>()
     var properties = HashMap<String, PropertyCodegen>()
     val codeBuilder = LLVMBuilder(arm)
-    val mainFunctions = ArrayList<String>()
     val extensionFunctions = HashMap<String, HashMap<String, FunctionCodegen>>()
 }
 
-fun parseAndAnalyze(sources: List<String>, disposer: Disposable, arm: Boolean = false): TranslationState {
+fun parseAndAnalyze(sources: List<String>, disposer: Disposable, mainFunction: String, arm: Boolean = false): TranslationState {
     val configuration = CompilerConfiguration()
     val messageCollector = object : MessageCollector {
         private var hasError = false
@@ -58,12 +58,10 @@ fun parseAndAnalyze(sources: List<String>, disposer: Disposable, arm: Boolean = 
             message: String,
             location: CompilerMessageSourceLocation?
         ) {
-            if (!severity.isError) {
-                return
+            if (severity.isError) {
+                System.err.println("[${severity.toString()}]${location?.path} ${location?.line}:${location?.column} $message")
+                hasError = true
             }
-
-            System.err.println("[${severity.toString()}]${location?.path} ${location?.line}:${location?.column} $message")
-            hasError = true
         }
     }
     configuration.put(CLIConfigurationKeys.MESSAGE_COLLECTOR_KEY, messageCollector)
@@ -74,8 +72,8 @@ fun parseAndAnalyze(sources: List<String>, disposer: Disposable, arm: Boolean = 
         disposer, configuration,
         EnvironmentConfigFiles.JVM_CONFIG_FILES
     )
-    val bindingContext = analyze(environment)?.bindingContext // ?: throw TranslationException()
-    return TranslationState(environment, bindingContext, arm)
+    val bindingContext = analyze(environment)?.bindingContext ?: throw TranslationException("Can't initialize binding context for project")
+    return TranslationState(environment, bindingContext, mainFunction, arm)
 }
 
 fun analyze(environment: KotlinCoreEnvironment): AnalysisResult? {

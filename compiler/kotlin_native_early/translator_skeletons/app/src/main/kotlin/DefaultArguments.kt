@@ -21,6 +21,13 @@ class DefaultArguments(raw: RawArguments) : Arguments(raw, name = "default") {
         shortNames = listOf('o')
     )
 
+    val mainClass = optionalParameter(
+        name = "main class",
+        aliasNames = listOf("main"),
+        default = "main",
+        shortNames = listOf('M')
+    )
+
     val sources = positionalArguments(
         name = "sources",
         description = "source files",
