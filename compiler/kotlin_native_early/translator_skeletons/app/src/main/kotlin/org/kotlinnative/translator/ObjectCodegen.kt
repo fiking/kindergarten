@@ -30,15 +30,11 @@ class ObjectCodegen(state: TranslationState,
 
         super.prepareForGenerate()
 
-        val classInstance = LLVMVariable("object.instance.$fullName", type, objectDeclaration.name, LLVMVariableScope(), pointer = 1)
+        val classInstance = LLVMVariable("object.instance.$structName", type, objectDeclaration.name, LLVMVariableScope(), pointer = 1)
         codeBuilder.addGlobalInitialize(classInstance, fields, initializedFields.map {
             val type = state.bindingContext?.get(BindingContext.EXPRESSION_TYPE_INFO, it.value)!!.type!!
             Pair(it.key, state.bindingContext.get(BindingContext.COMPILE_TIME_VALUE, it.value)!!.getValue(type).toString())
         }.toMap(), type)
-        variableManager.addGlobalVariable(fullName, classInstance)
-    }
-
-    override fun generate() {
-        super.generate()
+        variableManager.addGlobalVariable(structName, classInstance)
     }
 }

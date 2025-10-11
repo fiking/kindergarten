@@ -7,7 +7,7 @@ import org.kotlinnative.translator.llvm.LLVMSingleValue
 abstract class LLVMType() : Cloneable {
     companion object {
         fun mangleFunctionArguments(names: List<LLVMSingleValue>) =
-            mangleFunctionTypes(names.map { it.type!! })
+            mangleFunctionTypes(names.map { it.type })
 
         fun mangleFunctionTypes(names: List<LLVMType>) =
             if (names.size > 0) "_${names.joinToString(separator = "_", transform = { it.mangle })}" else ""

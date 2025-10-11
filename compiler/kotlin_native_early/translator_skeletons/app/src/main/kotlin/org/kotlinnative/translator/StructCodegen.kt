@@ -1,54 +1,35 @@
 package org.kotlinnative.translator
 
-import com.intellij.psi.PsiElement
-import org.jetbrains.kotlin.cfg.pseudocode.getSubtypesPredicate
-import org.jetbrains.kotlin.descriptors.ClassDescriptor
 import org.jetbrains.kotlin.lexer.KtTokens
-import org.jetbrains.kotlin.psi.KtClass
-import org.jetbrains.kotlin.psi.KtClassOrObject
-import org.jetbrains.kotlin.psi.KtDeclaration
-import org.jetbrains.kotlin.psi.KtEnumEntry
-import org.jetbrains.kotlin.psi.KtExpression
-import org.jetbrains.kotlin.psi.KtNamedDeclaration
-import org.jetbrains.kotlin.psi.KtNamedFunction
-import org.jetbrains.kotlin.psi.KtParameter
-import org.jetbrains.kotlin.psi.KtProperty
-import org.jetbrains.kotlin.psi.KtSecondaryConstructor
-import org.jetbrains.kotlin.psi.KtSuperTypeCallEntry
+import org.jetbrains.kotlin.psi.*
 import org.jetbrains.kotlin.resolve.BindingContext
 import org.jetbrains.kotlin.resolve.descriptorUtil.fqNameSafe
 import org.jetbrains.kotlin.types.KotlinType
-import org.kotlinnative.translator.llvm.LLVMBuilder
-import org.kotlinnative.translator.llvm.LLVMClassVariable
-import org.kotlinnative.translator.llvm.LLVMFunctionDescriptor
-import org.kotlinnative.translator.llvm.LLVMInstanceOfStandardType
-import org.kotlinnative.translator.llvm.LLVMRegisterScope
-import org.kotlinnative.translator.llvm.LLVMVariable
-import org.kotlinnative.translator.llvm.LLVMVariableScope
-import org.kotlinnative.translator.llvm.convertToNativeName
-import org.kotlinnative.translator.llvm.types.LLVMByteType
+import org.kotlinnative.translator.llvm.*
+import org.kotlinnative.translator.llvm.types.LLVMCharType
 import org.kotlinnative.translator.llvm.types.LLVMReferenceType
 import org.kotlinnative.translator.llvm.types.LLVMType
 import org.kotlinnative.translator.llvm.types.LLVMVoidType
+import java.util.*
 
 abstract class StructCodegen(val state: TranslationState,
                              val variableManager: VariableManager,
                              val classOrObject: KtClassOrObject,
                              val codeBuilder: LLVMBuilder,
                              val parentCodegen: StructCodegen? = null) {
+
     val fields = ArrayList<LLVMVariable>()
     val fieldsIndex = HashMap<String, LLVMClassVariable>()
     val nestedClasses = HashMap<String, ClassCodegen>()
     val enumFields = HashMap<String, LLVMVariable>()
-    val constructorFields = HashMap<String, ArrayList<LLVMVariable>>()
+    val constructorFields = HashMap<String, List<LLVMVariable>>()
     var primaryConstructorIndex: String? = null
     val initializedFields = HashMap<LLVMVariable, KtExpression>()
+    var methods = HashMap<String, FunctionCodegen>()
+
     abstract val type: LLVMReferenceType
     abstract var size: Int
-    var methods = HashMap<String, FunctionCodegen>()
     abstract val structName: String
-    val fullName: String
-        get() = structName
 
     open fun prepareForGenerate() {
         generateStruct()
@@ -59,53 +40,63 @@ abstract class StructCodegen(val state: TranslationState,
         }
     }
 
-    open fun generate() {
-        generateEnumFields()
-        generatePrimaryConstructor()
-        for (secondaryConstructor in classOrObject.getSecondaryConstructors()) {
-            generateSecondaryConstructor(secondaryConstructor)
-        }
+    fun calculateTypeSize() {
+        val classAlignment = fields.map { it.type.align }.max()?.toInt() ?: 0
+        var alignmentRemainder = 0
+        size = 0
 
-        val classVal = LLVMVariable("classvariable.this", type, pointer = if (type.isPrimitive) 0 else 1)
-        variableManager.addVariable("this", classVal, 0)
-        for (function in methods.values) {
-            function.generate(classVal)
+        for (item in fields) {
+            val currentFieldSize = if (item.pointer > 0) TranslationState.pointerAlign else item.type.align
+            alignmentRemainder -= (alignmentRemainder % currentFieldSize)
+            if (alignmentRemainder < currentFieldSize) {
+                size += classAlignment
+                alignmentRemainder = classAlignment - currentFieldSize
+            } else {
+                alignmentRemainder -= currentFieldSize
+            }
         }
     }
 
+    open fun generate() {
+        generateEnumFields()
+        generatePrimaryConstructor()
+        classOrObject.getSecondaryConstructors().map { generateSecondaryConstructor(it) }
+
+        val classVal = LLVMVariable("classvariable.this", type, pointer = if (type.isPrimitive) 0 else 1)
+        variableManager.addVariable("this", classVal, 0)
+
+        methods.values.map { it.generate(classVal) }
+    }
 
     fun generateInnerFields(declarations: List<KtDeclaration>) {
-        var offset = fields.size
-
         for (declaration in declarations) {
             when (declaration) {
                 is KtProperty -> {
-                    val ktType = state.bindingContext?.get(BindingContext.TYPE, declaration.typeReference)
-                        ?: state.bindingContext?.get(BindingContext.VARIABLE, declaration)!!.type
-                    val field = resolveType(declaration, ktType)
-                    field.offset = offset
-                    offset++
+                    val ktType = state.bindingContext.get(BindingContext.TYPE, declaration.typeReference)
+                        ?: state.bindingContext.get(BindingContext.VARIABLE, declaration)!!.type
+                    val field = resolveType(declaration, ktType, fields.size)
 
                     if (declaration.initializer != null) {
                         initializedFields.put(field, declaration.initializer!!)
                     }
+
                     fields.add(field)
                     fieldsIndex[field.label] = field
                 }
                 is KtEnumEntry -> {
                     val name = declaration.name!!
-                    val field = LLVMVariable("class.$fullName.$name", type, scope = LLVMVariableScope(), pointer = 2)
+                    val field = LLVMVariable("class.$structName.$name", type, scope = LLVMVariableScope(), pointer = 2)
                     enumFields.put(name, field)
                 }
-                is KtClass -> {
+                is KtClass ->
                     nestedClasses.put(declaration.fqName!!.asString(),
                         ClassCodegen(state,
                             VariableManager(state.globalVariableCollection),
                             declaration, codeBuilder, this))
-                }
             }
         }
     }
+
 
     private fun generateEnumFields() {
         val enumEntries = classOrObject.declarations.filter { it is KtEnumEntry }
@@ -119,39 +110,16 @@ abstract class StructCodegen(val state: TranslationState,
             val enumField = enumFields[name]!!
 
             codeBuilder.defineGlobalVariable(field, codeBuilder.makeStructInitializer(constructorFields[primaryConstructorIndex]!!, arguments))
-            codeBuilder.defineGlobalVariable(LLVMVariable(enumField.label, enumField.type, enumField.kotlinName, enumField.scope, enumField.pointer - 1), "$field")
+            codeBuilder.defineGlobalVariable(LLVMVariable(enumField.label, enumField.type, enumField.kotlinName, enumField.scope, enumField.pointer - 1), field.toString())
         }
     }
 
-    private fun generateStruct() {
-        codeBuilder.createClass(fullName, fields)
-    }
-
-    private fun generatePrimaryConstructor() {
-        val argFields = ArrayList<LLVMVariable>()
-
-        val classVal = LLVMVariable("classvariable.this", type, pointer = 1)
-        variableManager.addVariable("this", classVal, 0)
-
-        argFields.add(classVal)
-        argFields.addAll(constructorFields[primaryConstructorIndex]!!)
-
-        codeBuilder.addLLVMCodeToLocalPlace(LLVMFunctionDescriptor(fullName + primaryConstructorIndex, argFields, LLVMVoidType()))
-
-        codeBuilder.addStartExpression()
-        generateLoadArguments(classVal)
-        generateAssignments()
-        generateReturn(LLVMVariable("classvariable.this.addr", type, scope = LLVMRegisterScope(), pointer = 1))
-        genClassInitializers()
-        codeBuilder.addAnyReturn(LLVMVoidType())
-        codeBuilder.addEndExpression()
-    }
+    private fun generateStruct() =
+        codeBuilder.createClass(structName, fields)
 
     private fun generateSecondaryConstructor(secondaryConstructor: KtSecondaryConstructor) {
         val thisCall = secondaryConstructor.getDelegationCall().calleeExpression
-        val descriptor = state.bindingContext?.get(BindingContext.CONSTRUCTOR, secondaryConstructor)
-
-        val argFields = ArrayList<LLVMVariable>()
+        val descriptor = state.bindingContext.get(BindingContext.CONSTRUCTOR, secondaryConstructor)
 
         val classVal = LLVMVariable("classvariable.this", type, pointer = 1)
         variableManager.addVariable("this", classVal, 0)
@@ -160,17 +128,15 @@ abstract class StructCodegen(val state: TranslationState,
             LLVMInstanceOfStandardType(it.fqNameSafe.convertToNativeName(), it.type, state = state)
         }
 
-        argFields.add(classVal)
+        val argFields = mutableListOf(classVal)
         argFields.addAll(secondaryConstructorArguments)
         val currentConstructorIndex = LLVMType.mangleFunctionArguments(secondaryConstructorArguments)
         constructorFields.put(currentConstructorIndex, argFields)
-        codeBuilder.addLLVMCodeToLocalPlace(LLVMFunctionDescriptor(fullName + currentConstructorIndex, argFields, LLVMVoidType()))
+        codeBuilder.addLLVMCodeToLocalPlace(LLVMFunctionDescriptor(structName + currentConstructorIndex, argFields, LLVMVoidType()))
 
         codeBuilder.addStartExpression()
 
-        for (variable in secondaryConstructorArguments) {
-            variableManager.addVariable(variable.label, variable, 2)
-        }
+        secondaryConstructorArguments.map { variableManager.addVariable(it.label, it, 2) }
 
         val blockCodegen = object : BlockCodegen(state, variableManager, codeBuilder) {}
         val mainConstructorThis = blockCodegen.evaluateConstructorDelegationReferenceExpression(thisCall!!, this, secondaryConstructorArguments, 1) as LLVMVariable
@@ -182,10 +148,26 @@ abstract class StructCodegen(val state: TranslationState,
         codeBuilder.addEndExpression()
     }
 
-    private fun generateLoadArguments(thisField: LLVMVariable) {
+    private fun generatePrimaryConstructor() {
+        val classVal = LLVMVariable("classvariable.this", type, pointer = 1)
+        variableManager.addVariable("this", classVal, 0)
 
-        val thisVariable = LLVMVariable(thisField.label, thisField.type, thisField.label,
-            LLVMRegisterScope(), pointer = 0)
+        val argFields = mutableListOf(classVal)
+        argFields.addAll(constructorFields[primaryConstructorIndex]!!)
+
+        codeBuilder.addLLVMCodeToLocalPlace(LLVMFunctionDescriptor(structName + primaryConstructorIndex, argFields, LLVMVoidType()))
+
+        codeBuilder.addStartExpression()
+        generateLoadArguments(classVal)
+        generateAssignments()
+        generateReturn(LLVMVariable("classvariable.this.addr", type, scope = LLVMRegisterScope(), pointer = 1))
+        genClassInitializers()
+        codeBuilder.addAnyReturn(LLVMVoidType())
+        codeBuilder.addEndExpression()
+    }
+
+    private fun generateLoadArguments(thisField: LLVMVariable) {
+        val thisVariable = LLVMVariable(thisField.label, thisField.type, thisField.label, LLVMRegisterScope(), pointer = 0)
         codeBuilder.loadArgument(thisVariable, false)
 
         constructorFields[primaryConstructorIndex]!!.forEach {
@@ -212,37 +194,39 @@ abstract class StructCodegen(val state: TranslationState,
                 }
             }
         }
+
         val blockCodegen = object : BlockCodegen(state, variableManager, codeBuilder) {}
         val receiverThis = LLVMVariable("classvariable.this.addr", type, scope = LLVMRegisterScope(), pointer = 1)
         variableManager.addVariable("this", receiverThis, 2)
+
         for ((variable, initializer) in initializedFields) {
             val left = blockCodegen.evaluateMemberMethodOrField(receiverThis, variable.label, blockCodegen.topLevel, call = null)!!
             val right = blockCodegen.evaluateExpression(initializer, scopeDepth = blockCodegen.topLevel)!!
             blockCodegen.executeBinaryExpression(KtTokens.EQ, referenceName = null, left = left, right = right)
         }
+
         variableManager.pullOneUpwardLevelVariable("this")
     }
 
     private fun generateReturn(src: LLVMVariable) {
         val dst = LLVMVariable("classvariable.this", type, scope = LLVMRegisterScope(), pointer = 1)
 
-        val castedDst = codeBuilder.bitcast(dst, LLVMVariable("", LLVMByteType(), pointer = 1))
-        val castedSrc = codeBuilder.bitcast(src, LLVMVariable("", LLVMByteType(), pointer = 1))
+        val castedDst = codeBuilder.bitcast(dst, LLVMVariable("", LLVMCharType(), pointer = 1))
+        val castedSrc = codeBuilder.bitcast(src, LLVMVariable("", LLVMCharType(), pointer = 1))
 
         codeBuilder.memcpy(castedDst, castedSrc, size)
     }
 
-    protected fun resolveType(field: KtNamedDeclaration, ktType: KotlinType): LLVMClassVariable {
+    protected fun resolveType(field: KtNamedDeclaration, ktType: KotlinType, offset: Int): LLVMClassVariable {
         val annotations = parseFieldAnnotations(field)
-        val fieldName = state.bindingContext?.get(BindingContext.VALUE_PARAMETER, field as?KtParameter)?.fqNameSafe?.convertToNativeName()
+        val fieldName = state.bindingContext.get(BindingContext.VALUE_PARAMETER, field as?KtParameter)?.fqNameSafe?.convertToNativeName()
             ?: field.fqName?.asString() ?: field.name!!
 
         val result = LLVMInstanceOfStandardType(fieldName, ktType, LLVMRegisterScope(), state = state)
 
         if (result.type is LLVMReferenceType) {
-            val type = result.type as LLVMReferenceType
-            type.prefix = "class"
-            type.byRef = true
+            result.type.prefix = "class"
+            result.type.byRef = true
         }
 
         if (state.classes.containsKey(field.name!!)) {
@@ -253,48 +237,17 @@ abstract class StructCodegen(val state: TranslationState,
             result.pointer = 0
         }
 
-        return LLVMClassVariable(result.label, result.type, result.pointer)
+        return LLVMClassVariable(result.label, result.type, result.pointer, offset)
     }
 
-    private fun parseFieldAnnotations(field: KtNamedDeclaration): Set<String> {
-        val result = HashSet<String>()
+    private fun parseFieldAnnotations(field: KtNamedDeclaration): Set<String> =
+        field.annotationEntries.map { state.bindingContext.get(BindingContext.ANNOTATION, it)?.type.toString() }.toHashSet()
 
-        for (annotation in field.annotationEntries) {
-            val annotationDescriptor = state.bindingContext?.get(BindingContext.ANNOTATION, annotation)
-            val type = annotationDescriptor?.type.toString()
-
-            result.add(type)
-        }
-
-        return result
-    }
-
-    protected fun genClassInitializers() {
-        for (init in classOrObject.getAnonymousInitializers()) {
-            val blockCodegen = object : BlockCodegen(state, variableManager, codeBuilder) {
-                fun generate(expr: PsiElement?) {
-                    evaluateCodeBlock(expr, scopeDepth = topLevel)
-                }
+    protected fun genClassInitializers() =
+        classOrObject.getAnonymousInitializers().map {
+            object : BlockCodegen(state, variableManager, codeBuilder) {
+                fun generate() = evaluateCodeBlock(it.body, scopeDepth = topLevel)
             }
-            blockCodegen.generate(init.body)
-        }
+        }.map { it.generate() }
 
-    }
-
-    fun calculateTypeSize() {
-        val classAlignment = fields.map { it.type.align }.max()?.toInt() ?: 0
-        var alignmentRemainder = 0
-        size = 0
-
-        for (item in fields) {
-            val currentFieldType = if (item.pointer > 0) TranslationState.pointerSize else item.type.size
-            alignmentRemainder -= (alignmentRemainder % currentFieldType)
-            if (alignmentRemainder < currentFieldType) {
-                size += classAlignment
-                alignmentRemainder = classAlignment - currentFieldType
-            } else {
-                alignmentRemainder -= currentFieldType
-            }
-        }
-    }
 }
