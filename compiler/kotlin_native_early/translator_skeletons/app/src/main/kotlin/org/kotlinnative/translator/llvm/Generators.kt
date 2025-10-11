@@ -51,19 +51,12 @@ fun LLVMInstanceOfStandardType(name: String, type: KotlinType, scope: LLVMScope 
             val declarationDescriptor = type.constructor.declarationDescriptor!!
             val refName = declarationDescriptor.fqNameSafe.asString()
             val refType = state.classes[type.toString()]?.type ?: LLVMReferenceType(refName, align = TranslationState.pointerAlign, prefix = "class")
-
-            val result = LLVMVariable(name, refType, name, scope, pointer = 1)
-            var currentPrefix = ""
-            for (currentLocation in type.getSubtypesPredicate().toString().split(".").dropLast(1)) {
-                currentPrefix += (if (currentPrefix.length > 0) "." else "") + currentLocation
-                refType.location.add(currentPrefix)
-            }
-            result
+            LLVMVariable(name, refType, name, scope, pointer = 1)
         }
     }
 }
 
-fun LLVMMapStandardType(type: KotlinType, state: TranslationState): LLVMType =
+fun LLVMMapStandardType(type: KotlinType, state: TranslationState) =
     LLVMInstanceOfStandardType("type", type, LLVMRegisterScope(), state).type
 
 fun String.addBeforeIfNotEmpty(add: String): String =
@@ -73,6 +66,10 @@ fun String.addBeforeIfNotEmpty(add: String): String =
 fun String.addAfterIfNotEmpty(add: String): String =
     if (this.length > 0) this + add else this
 
+fun String.indexOfOrLast(str: Char, startIndex: Int = 0): Int {
+    val pos = this.indexOf(str, startIndex)
+    return if (pos < 0) this.length else pos
+}
 
 fun FqName.convertToNativeName(): String =
     this.asString().replace(".<init>", "")

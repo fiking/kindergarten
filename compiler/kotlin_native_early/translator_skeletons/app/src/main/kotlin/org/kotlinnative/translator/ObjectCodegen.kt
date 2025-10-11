@@ -19,10 +19,6 @@ class ObjectCodegen(state: TranslationState,
     override val type: LLVMReferenceType = LLVMReferenceType(structName, "class", align = TranslationState.pointerAlign, size = TranslationState.pointerSize, byRef = true)
 
     init {
-        if (parentCodegen != null) {
-            type.location.addAll(parentCodegen.type.location)
-            type.location.add(parentCodegen.structName)
-        }
         primaryConstructorIndex = LLVMType.mangleFunctionArguments(emptyList())
         constructorFields.put(primaryConstructorIndex!!, arrayListOf())
     }
