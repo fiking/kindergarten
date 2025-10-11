@@ -17,6 +17,9 @@ class LLVMFloatType() : LLVMType() {
     override fun operatorPlus(firstOp: LLVMSingleValue, secondOp: LLVMSingleValue): LLVMExpression =
         LLVMExpression(LLVMFloatType(), "fadd float $firstOp, $secondOp")
 
+    override fun operatorDiv(firstOp: LLVMSingleValue, secondOp: LLVMSingleValue): LLVMExpression =
+        LLVMExpression(LLVMFloatType(), "fdiv float $firstOp, $secondOp")
+
     override fun operatorInc(firstOp: LLVMSingleValue): LLVMExpression =
         LLVMExpression(LLVMDoubleType(), "fadd float $firstOp, 1.0")
 

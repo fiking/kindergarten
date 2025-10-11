@@ -29,6 +29,9 @@ class LLVMIntType() : LLVMType() {
         secondOp: LLVMSingleValue
     ): LLVMExpression = LLVMExpression(LLVMIntType(), "sub nsw i32 $firstOp, $secondOp")
 
+    override fun operatorDiv(firstOp: LLVMSingleValue, secondOp: LLVMSingleValue): LLVMExpression =
+        LLVMExpression(LLVMIntType(), "sdiv i32 $firstOp, $secondOp")
+
     override fun operatorLt(firstOp: LLVMSingleValue, secondOp: LLVMSingleValue): LLVMExpression =
         LLVMExpression(LLVMIntType(), "icmp slt i32 $firstOp, $secondOp")
 

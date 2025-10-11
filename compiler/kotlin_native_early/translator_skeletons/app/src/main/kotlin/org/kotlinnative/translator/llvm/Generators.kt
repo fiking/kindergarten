@@ -22,7 +22,7 @@ import org.kotlinnative.translator.llvm.types.LLVMStringType
 import org.kotlinnative.translator.llvm.types.LLVMType
 import org.kotlinnative.translator.llvm.types.LLVMVoidType
 
-fun LLVMFunctionDescriptor(name: String, argTypes: List<LLVMVariable>?, returnType: LLVMType, declare: Boolean = false, arm: Boolean = false) =
+fun LLVMFunctionDescriptor(name: String, argTypes: List<LLVMVariable>?, returnType: LLVMType, declare: Boolean = false) =
     "${if (declare) "declare" else "define weak"} $returnType @$name(${
         argTypes?.mapIndexed { i: Int, s: LLVMVariable ->
             "${s.getType()} ${if (s.type is LLVMReferenceType && !(s.type as LLVMReferenceType).byRef) "byval" else ""} %${s.label}"

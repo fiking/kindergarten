@@ -10,7 +10,6 @@ import org.jetbrains.kotlin.lexer.KtTokens
 import org.jetbrains.kotlin.psi.*
 import org.jetbrains.kotlin.psi.psiUtil.getNextSiblingIgnoringWhitespaceAndComments
 import org.jetbrains.kotlin.psi.psiUtil.getQualifiedExpressionForReceiver
-import org.jetbrains.kotlin.psi.psiUtil.siblings
 import org.jetbrains.kotlin.resolve.BindingContext
 import org.jetbrains.kotlin.resolve.calls.callUtil.getType
 import org.jetbrains.kotlin.resolve.calls.model.DefaultValueArgument
@@ -22,7 +21,6 @@ import org.jetbrains.kotlin.resolve.calls.util.getValueArgumentsInParentheses
 import org.jetbrains.kotlin.resolve.constants.TypedCompileTimeConstant
 import org.jetbrains.kotlin.resolve.descriptorUtil.fqNameSafe
 import org.jetbrains.kotlin.resolve.scopes.receivers.ExpressionReceiver
-import org.jetbrains.kotlin.types.typeUtil.isPrimitiveNumberType
 import org.jetbrains.kotlin.utils.IDEAPluginsCompatibilityAPI
 import org.kotlinnative.translator.llvm.*
 import org.kotlinnative.translator.llvm.types.*
@@ -736,7 +734,7 @@ abstract class BlockCodegen(val state: TranslationState, val variableManager: Va
             }
             else -> addPrimitiveReferenceOperation(referenceName!!, firstNativeOp, secondNativeOp)
         }
-        val resultOp = codeBuilder.getNewVariable(llvmExpression.variableType)
+        val resultOp = codeBuilder.getNewVariable(llvmExpression.variableType, pointer = llvmExpression.pointer)
         codeBuilder.addAssignment(resultOp, llvmExpression)
         return resultOp
     }
@@ -772,6 +770,7 @@ abstract class BlockCodegen(val state: TranslationState, val variableManager: Va
             KtTokens.RETURN_KEYWORD -> evaluateReturnInstruction(element, scopeDepth)
             KtTokens.IF_KEYWORD -> evaluateIfOperator(element.context as KtIfExpression, scopeDepth, isExpression = false)
             KtTokens.WHILE_KEYWORD -> evaluateWhileOperator(element.context as KtWhileExpression, scopeDepth)
+            KtTokens.FOR_KEYWORD -> evaluateForOperator(element.context as KtForExpression, scopeDepth)
             else -> null
         }
     }
@@ -1108,7 +1107,59 @@ abstract class BlockCodegen(val state: TranslationState, val variableManager: Va
                 codeBuilder.storeVariable(firstOp, resultOp)
                 return LLVMExpression(resultOp.type, "load ${firstOp.getType()} $firstOp, align ${firstOp.type!!.align}")
             }
-            else -> throw UnsupportedOperationException("Unknown binary operator")
+            ".." -> {
+                val descriptor = state.classes["IntRange"]
+                val arguments = listOf(firstOp, secondNativeOp)
+                val detectedConstructor = LLVMType.mangleFunctionTypes(arguments.map { it.type!! })
+                val result = evaluateConstructorCallExpression(LLVMVariable(descriptor!!.fullName + detectedConstructor, descriptor.type, scope = LLVMVariableScope()), arguments)
+                return LLVMExpression(result!!.type!!, "load ${descriptor.type}** $result, align ${descriptor.type.align}", pointer = 1)
+            }
+            else -> throw UnsupportedOperationException("Unknown binary operator: $operator(${firstNativeOp.type}, ${secondNativeOp.type})")
         }
+    }
+
+    private fun evaluateForOperator(expr: KtForExpression, scopeDepth: Int): LLVMVariable? {
+        val range = evaluateExpression(expr.loopRange, scopeDepth + 1)!!
+        val conditionLabel = codeBuilder.getNewLabel(prefix = "for_condition")
+        val bodyLabel = codeBuilder.getNewLabel(prefix = "for_body")
+        val exitLabel = codeBuilder.getNewLabel(prefix = "for_exit")
+        val rangeTypeName = (range.type as LLVMReferenceType).type
+
+        val descriptor = state.classes[rangeTypeName]
+        val method = descriptor!!.methods["$rangeTypeName.iterator"] ?: throw UnexpectedException("$rangeTypeName.iterator")
+        val returnType = method.returnType!!.type
+        val returnTypeName = (returnType as LLVMReferenceType).type
+        val iteratorDescriptor = state.classes[returnTypeName]
+        val nextDescriptor = iteratorDescriptor!!.methods["$returnTypeName.nextInt"] ?: throw UnexpectedException("$returnTypeName.hasNext")
+
+        val conditionIterator = evaluateFunctionCallExpression(LLVMVariable("$rangeTypeName.iterator", returnType, scope = LLVMVariableScope()), listOf(range))!!
+        val iteratorThisArgument = codeBuilder.loadArgumentIfRequired(conditionIterator, LLVMVariable("type", descriptor.type, pointer = 1))
+        codeBuilder.addUnconditionalJump(conditionLabel)
+        codeBuilder.markWithLabel(conditionLabel)
+        var conditionResult = evaluateFunctionCallExpression(LLVMVariable("$returnTypeName.hasNext", LLVMBooleanType(), scope = LLVMVariableScope()), listOf(iteratorThisArgument))!!
+
+        while (conditionResult.pointer > 0) {
+            conditionResult = codeBuilder.loadAndGetVariable(conditionResult as LLVMVariable)
+        }
+
+        codeBuilder.addCondition(conditionResult, bodyLabel, exitLabel)
+
+        codeBuilder.addUnconditionalJump(bodyLabel)
+        codeBuilder.markWithLabel(bodyLabel)
+        val currentParameter = evaluateFunctionCallExpression(LLVMVariable("$returnTypeName.nextInt", LLVMIntType(), scope = LLVMVariableScope()), listOf(iteratorThisArgument))!!
+
+        val allocVar = variableManager.receiveVariable(expr.loopParameter!!.name!!, nextDescriptor.returnType!!.type, LLVMRegisterScope(), pointer =
+            nextDescriptor.returnType!!.pointer)
+        variableManager.addVariable(expr.loopParameter!!.name!!, allocVar, scopeDepth + 1)
+        codeBuilder.allocStackVar(allocVar)
+        allocVar.pointer++
+        allocVar.kotlinName = expr.loopParameter!!.name!!
+
+        addPrimitiveBinaryOperation(KtTokens.EQ, null, allocVar, currentParameter)
+
+        evaluateCodeBlock(expr.body, null, conditionLabel, exitLabel, scopeDepth + 1)
+        codeBuilder.markWithLabel(exitLabel)
+
+        return null
     }
 }

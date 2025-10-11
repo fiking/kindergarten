@@ -58,6 +58,9 @@ class LLVMLongType() : LLVMType() {
     override fun operatorMod(firstOp: LLVMSingleValue, secondOp: LLVMSingleValue): LLVMExpression =
         LLVMExpression(LLVMLongType(), "srem i64 $firstOp, $secondOp")
 
+    override fun operatorDiv(firstOp: LLVMSingleValue, secondOp: LLVMSingleValue): LLVMExpression =
+        LLVMExpression(LLVMLongType(), "sdiv i64 $firstOp, $secondOp")
+
     override fun convertFrom(source: LLVMSingleValue): LLVMExpression = when (source.type!!) {
         is LLVMBooleanType,
         is LLVMByteType,
