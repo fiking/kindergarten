@@ -9,13 +9,19 @@ import org.jetbrains.kotlin.types.typeUtil.isUnit
 import org.kotlinnative.translator.TranslationState
 import org.kotlinnative.translator.llvm.types.*
 
-fun LLVMFunctionDescriptor(name: String, argTypes: List<LLVMVariable>?, returnType: LLVMType, declare: Boolean = false) =
+fun LLVMFunctionDescriptor(name: String,
+                           argTypes: List<LLVMVariable>?,
+                           returnType: LLVMType,
+                           declare: Boolean = false) =
     "${if (declare) "declare" else "define weak"} $returnType @$name(${
         argTypes?.mapIndexed { i: Int, s: LLVMVariable ->
             "${s.pointedType} ${if (s.type is LLVMReferenceType && !(s.type as LLVMReferenceType).byRef) "byval" else ""} %${s.label}"
         }?.joinToString()}) #0"
 
-fun LLVMInstanceOfStandardType(name: String, type: KotlinType, scope: LLVMScope = LLVMRegisterScope(), state: TranslationState): LLVMVariable {
+fun LLVMInstanceOfStandardType(name: String,
+                               type: KotlinType,
+                               scope: LLVMScope = LLVMRegisterScope(),
+                               state: TranslationState): LLVMVariable {
     val typeName = type.toString().dropLastWhile { it == '?' }
     val pointerMark = if (type.isMarkedNullable) 1 else 0
     return when {
@@ -41,7 +47,8 @@ fun LLVMInstanceOfStandardType(name: String, type: KotlinType, scope: LLVMScope 
     }
 }
 
-fun LLVMMapStandardType(type: KotlinType, state: TranslationState) =
+fun LLVMMapStandardType(type: KotlinType,
+                        state: TranslationState) =
     LLVMInstanceOfStandardType("type", type, LLVMRegisterScope(), state).type
 
 fun String.addBeforeIfNotEmpty(add: String): String =

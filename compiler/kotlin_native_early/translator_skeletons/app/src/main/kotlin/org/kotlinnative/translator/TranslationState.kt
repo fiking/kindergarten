@@ -23,17 +23,13 @@ import org.kotlinnative.translator.exceptions.TranslationException
 import org.kotlinnative.translator.llvm.LLVMBuilder
 import org.kotlinnative.translator.llvm.LLVMVariable
 
-class TranslationState(val environment: KotlinCoreEnvironment, val bindingContext: BindingContext, val mainFunction: String, arm: Boolean) {
-    companion object {
-        var POINTER_ALIGN = 4
-        var POINTER_SIZE = 4
-    }
-
-    init {
-        POINTER_ALIGN = if (arm) 4 else 8
-        POINTER_SIZE = if (arm) 4 else 8
-    }
-
+class TranslationState
+private constructor
+    (
+    val environment: KotlinCoreEnvironment,
+    val bindingContext: BindingContext,
+    val mainFunction: String, arm: Boolean
+) {
     var externalFunctions = HashMap<String, FunctionCodegen>()
     var functions = HashMap<String, FunctionCodegen>()
     val globalVariableCollection = HashMap<String, LLVMVariable>()
@@ -42,73 +38,93 @@ class TranslationState(val environment: KotlinCoreEnvironment, val bindingContex
     var properties = HashMap<String, PropertyCodegen>()
     val codeBuilder = LLVMBuilder(arm)
     val extensionFunctions = HashMap<String, HashMap<String, FunctionCodegen>>()
-}
 
-fun parseAndAnalyze(sources: List<String>, disposer: Disposable, mainFunction: String, arm: Boolean = false): TranslationState {
-    val configuration = CompilerConfiguration()
-    val messageCollector = object : MessageCollector {
-        private var hasError = false
-        override fun clear() {
-            TODO("Not yet implemented")
-        }
+    init {
+        POINTER_ALIGN = if (arm) 4 else 8
+        POINTER_SIZE = if (arm) 4 else 8
+    }
 
-        override fun hasErrors(): Boolean = hasError
-        override fun report(
-            severity: CompilerMessageSeverity,
-            message: String,
-            location: CompilerMessageSourceLocation?
-        ) {
-            if (severity.isError) {
-                System.err.println("[${severity.toString()}]${location?.path} ${location?.line}:${location?.column} $message")
-                hasError = true
+    companion object {
+        var POINTER_ALIGN = 4
+        var POINTER_SIZE = 4
+
+        fun createTranslationState(
+            sources: List<String>,
+            disposer: Disposable,
+            mainFunction: String,
+            arm: Boolean = false
+        ): TranslationState {
+            val configuration = CompilerConfiguration()
+            val messageCollector = object : MessageCollector {
+                private var hasError = false
+                override fun clear() {
+                    TODO("Not yet implemented")
+                }
+
+                override fun hasErrors(): Boolean = hasError
+                override fun report(
+                    severity: CompilerMessageSeverity,
+                    message: String,
+                    location: CompilerMessageSourceLocation?
+                ) {
+                    if (severity.isError) {
+                        System.err.println("[${severity.toString()}]${location?.path} ${location?.line}:${location?.column} $message")
+                        hasError = true
+                    }
+                }
             }
+            configuration.put(CLIConfigurationKeys.MESSAGE_COLLECTOR_KEY, messageCollector)
+            configuration.put(CommonConfigurationKeys.MODULE_NAME, "benchmark")
+            configuration.addKotlinSourceRoots(sources)
+
+            val environment = KotlinCoreEnvironment.createForProduction(
+                disposer, configuration,
+                EnvironmentConfigFiles.JVM_CONFIG_FILES
+            )
+            val bindingContext = analyze(environment)?.bindingContext ?: throw TranslationException(
+                "Can't initialize binding context for project"
+            )
+            return TranslationState(environment, bindingContext, mainFunction, arm)
+        }
+
+        private fun analyze(environment: KotlinCoreEnvironment): AnalysisResult? {
+            val collector =
+                environment.configuration.getNotNull(CLIConfigurationKeys.MESSAGE_COLLECTOR_KEY)
+            val resolvedKlibs =
+                environment.configuration.get(JVMConfigurationKeys.KLIB_PATHS)?.let { klibPaths ->
+                    jvmResolveLibraries(klibPaths, collector.toLogger())
+                }?.getFullList() ?: emptyList()
+
+            val analyzerWithCompilerReport = AnalyzerWithCompilerReport(environment.configuration)
+            analyzerWithCompilerReport.analyzeAndReport(environment.getSourceFiles()) {
+                val project = environment.project
+                val sourceFiles = environment.getSourceFiles()
+                val sourcesOnly =
+                    TopDownAnalyzerFacadeForJVM.newModuleSearchScope(project, sourceFiles)
+                val moduleOutputs = environment.configuration.get(JVMConfigurationKeys.MODULES)
+                    ?.mapNotNullTo(hashSetOf()) { module ->
+                        environment.findLocalFile(module.getOutputDirectory())
+                    }.orEmpty()
+                val scope = if (moduleOutputs.isEmpty()) sourcesOnly else sourcesOnly.uniteWith(
+                    KotlinToJVMBytecodeCompiler.DirectoriesScope(project, moduleOutputs)
+                )
+//            printFile(sourceFiles.first())
+                TopDownAnalyzerFacadeForJVM.analyzeFilesWithJavaIntegration(
+                    project,
+                    sourceFiles,
+                    NoScopeRecordCliBindingTrace(),
+                    environment.configuration,
+                    environment::createPackagePartProvider,
+                    sourceModuleSearchScope = scope,
+                    klibList = resolvedKlibs
+                )
+            }
+            val analysisResult = analyzerWithCompilerReport.analysisResult
+            return if (!analyzerWithCompilerReport.hasErrors())
+                analysisResult
+            else
+                null
         }
     }
-    configuration.put(CLIConfigurationKeys.MESSAGE_COLLECTOR_KEY, messageCollector)
-    configuration.put(CommonConfigurationKeys.MODULE_NAME, "benchmark")
-    configuration.addKotlinSourceRoots(sources)
-
-    val environment = KotlinCoreEnvironment.createForProduction(
-        disposer, configuration,
-        EnvironmentConfigFiles.JVM_CONFIG_FILES
-    )
-    val bindingContext = analyze(environment)?.bindingContext ?: throw TranslationException("Can't initialize binding context for project")
-    return TranslationState(environment, bindingContext, mainFunction, arm)
 }
 
-fun analyze(environment: KotlinCoreEnvironment): AnalysisResult? {
-    val collector = environment.configuration.getNotNull(CLIConfigurationKeys.MESSAGE_COLLECTOR_KEY)
-    val resolvedKlibs =
-        environment.configuration.get(JVMConfigurationKeys.KLIB_PATHS)?.let { klibPaths ->
-            jvmResolveLibraries(klibPaths, collector.toLogger())
-        }?.getFullList() ?: emptyList()
-
-    val analyzerWithCompilerReport = AnalyzerWithCompilerReport(environment.configuration)
-    analyzerWithCompilerReport.analyzeAndReport(environment.getSourceFiles()) {
-        val project = environment.project
-        val sourceFiles = environment.getSourceFiles()
-        val sourcesOnly = TopDownAnalyzerFacadeForJVM.newModuleSearchScope(project, sourceFiles)
-        val moduleOutputs = environment.configuration.get(JVMConfigurationKeys.MODULES)
-            ?.mapNotNullTo(hashSetOf()) { module ->
-                environment.findLocalFile(module.getOutputDirectory())
-            }.orEmpty()
-        val scope = if (moduleOutputs.isEmpty()) sourcesOnly else sourcesOnly.uniteWith(
-            KotlinToJVMBytecodeCompiler.DirectoriesScope(project, moduleOutputs)
-        )
-//            printFile(sourceFiles.first())
-        TopDownAnalyzerFacadeForJVM.analyzeFilesWithJavaIntegration(
-            project,
-            sourceFiles,
-            NoScopeRecordCliBindingTrace(),
-            environment.configuration,
-            environment::createPackagePartProvider,
-            sourceModuleSearchScope = scope,
-            klibList = resolvedKlibs
-        )
-    }
-    val analysisResult = analyzerWithCompilerReport.analysisResult
-    return if (!analyzerWithCompilerReport.hasErrors())
-        analysisResult
-    else
-        null
-}

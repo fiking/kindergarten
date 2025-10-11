@@ -18,7 +18,7 @@ class DefaultArguments(raw: RawArguments) : Arguments(raw, name = "default") {
 
     val output = optionalParameter(
         name = "output",
-        description = "output file",
+        description = "output file path",
         shortNames = listOf('o')
     )
 
