@@ -290,7 +290,7 @@ abstract class BlockCodegen(val state: TranslationState, val variableManager: Va
         val packageNameSecond = resolvedCall.candidateDescriptor.containingDeclaration.fqNameSafe.convertToNativeName()
 
         val names = parseArgList(selector, scopeDepth)
-        val type = if (names.size > 0) LLVMType.mangleFunctionArguments(names) else ""
+        val type = LLVMType.mangleFunctionArguments(names)
 
         val constructedFunctionName = standardType.mangle() + nameWithoutMangling.addBeforeIfNotEmpty(".") + type
         val targetExtension = state.extensionFunctions[standardType.toString()]
@@ -323,6 +323,7 @@ abstract class BlockCodegen(val state: TranslationState, val variableManager: Va
         val type = receiver.type as LLVMReferenceType
         val clazz = resolveClassOrObjectLocation(type) ?: throw UnexpectedException(type.toString() + receiver.toString())
         val field = clazz.fieldsIndex[selectorName]
+
         if (field != null) {
             val result = codeBuilder.getNewVariable(field.type, pointer = field.pointer + 1)
             codeBuilder.loadClassField(result, receiver, field.offset)
@@ -330,16 +331,21 @@ abstract class BlockCodegen(val state: TranslationState, val variableManager: Va
         }
 
         (call as? KtCallExpression) ?: throw UnexpectedException("$receiver:$selectorName")
-        val names = parseArgList(call as KtCallExpression, scopeDepth)
-        val types = if (names.size > 0) LLVMType.mangleFunctionArguments(names) else ""
-        val methodName = call.getCall(state.bindingContext!!)!!.getResolvedCallWithAssert(state.bindingContext).candidateDescriptor.fqNameSafe.asString() + types
+        val resolvedCall = call.getCall(state.bindingContext)!!.getResolvedCallWithAssert(state.bindingContext)
+        val functionDescriptor = resolvedCall.candidateDescriptor
+        val functionArguments = functionDescriptor.valueParameters.map { it -> it.type }.map { LLVMMapStandardType(it, state) }
+        val methodName = functionDescriptor.fqNameSafe.asString() + LLVMType.mangleFunctionTypes(functionArguments)
 
         val method = clazz.methods[methodName] ?: throw UnexpectedException(methodName)
-        val returnType = clazz.methods[methodName]!!.returnType!!.type
+        val returnType = method.returnType!!.type
 
+        val arguments = resolvedCall.valueArguments.toSortedMap(compareBy { it.index }).values
+        val names = parseNamedValueArguments(arguments, method.defaultValues, scopeDepth)
         val loadedArgs = codeBuilder.loadArgsIfRequired(names, method.args)
+
         val callArgs = mutableListOf<LLVMSingleValue>(receiver)
         callArgs.addAll(loadedArgs)
+
         return evaluateFunctionCallExpression(LLVMVariable(methodName, returnType, scope = LLVMVariableScope()), callArgs)
     }
 
@@ -378,7 +384,7 @@ abstract class BlockCodegen(val state: TranslationState, val variableManager: Va
                         val targetClassName = (receiver.type as LLVMReferenceType).type
 
                         val names = parseValueArguments(callMaker.valueArguments, scope)
-                        val methodName = "$targetClassName.$arrayActionType${if (names.size > 0) LLVMType.mangleFunctionArguments(names) else ""}"
+                        val methodName = "$targetClassName.$arrayActionType${LLVMType.mangleFunctionArguments(names)}"
                         val type = receiver.type as LLVMReferenceType
                         val clazz = resolveClassOrObjectLocation(type) ?: throw UnexpectedException(type.toString())
 
@@ -613,33 +619,22 @@ abstract class BlockCodegen(val state: TranslationState, val variableManager: Va
     }
 
 
-    private fun parseArgList(expr: KtCallExpression, scopeDepth: Int): List<LLVMSingleValue> {
-        val args = expr.getValueArgumentsInParentheses()
-        return parseValueArguments(args, scopeDepth)
-    }
+    private fun parseArgList(expr: KtCallExpression, scopeDepth: Int): List<LLVMSingleValue> =
+        parseValueArguments(expr.getValueArgumentsInParentheses(), scopeDepth)
 
-    private fun parseValueArguments(args: List<ValueArgument>, scopeDepth: Int): List<LLVMSingleValue> {
-        val result = ArrayList<LLVMSingleValue>()
 
-        for (arg in args) {
-            result.add(parseOneValueArgument(arg, scopeDepth))
-        }
+    private fun parseValueArguments(args: List<ValueArgument>, scopeDepth: Int): List<LLVMSingleValue> =
+        args.map { parseOneValueArgument(it, scopeDepth) }
 
-        return result
-    }
-
-    fun parseOneValueArgument(arg: ValueArgument, scopeDepth: Int): LLVMSingleValue {
-        return evaluateExpression(arg.getArgumentExpression(), scopeDepth) as LLVMSingleValue
-    }
+    fun parseOneValueArgument(arg: ValueArgument, scopeDepth: Int): LLVMSingleValue =
+        evaluateExpression(arg.getArgumentExpression(), scopeDepth) as LLVMSingleValue
 
     private fun parseNamedValueArguments(args: MutableCollection<ResolvedValueArgument>, defaultValues: List<KtExpression?>, scopeDepth: Int): List<LLVMSingleValue> =
         args.mapIndexed(fun(i: Int, value: ResolvedValueArgument): LLVMSingleValue {
             return when (value) {
                 is DefaultValueArgument -> evaluateExpression(defaultValues[i], scopeDepth)!!
-                else -> {
-                    val expr = ((value as ExpressionValueArgument).valueArgument as KtValueArgument).getArgumentExpression()!!
-                    evaluateExpression(expr, scopeDepth)!!
-                }
+                is ExpressionValueArgument -> evaluateExpression((value.valueArgument as KtValueArgument).getArgumentExpression()!!, scopeDepth)!!
+                else -> throw UnexpectedException("Wrong parser argument")
             }
         }).toList()
 
@@ -900,7 +895,7 @@ abstract class BlockCodegen(val state: TranslationState, val variableManager: Va
 
         val primitivePointer = LLVMMapStandardType(variable.type, state) !is LLVMReferred
 
-        val allocVar = variableManager.receiveVariable(identifier, expectedExpressionType.type, LLVMRegisterScope(), pointer = expectedExpressionType.pointer+1)
+        val allocVar = variableManager.receiveVariable(identifier, expectedExpressionType.type, LLVMRegisterScope(), pointer = expectedExpressionType.pointer + 1)
         codeBuilder.allocStackVar(allocVar, pointer = true)
 
         variableManager.addVariable(identifier, allocVar, scopeDepth)
@@ -1178,7 +1173,7 @@ abstract class BlockCodegen(val state: TranslationState, val variableManager: Va
         val loopParameter = state.bindingContext?.get(BindingContext.VALUE_PARAMETER, expr.loopParameter!!)?.fqNameSafe?.asString() ?: expr.loopParameter!!.name!!
 
         val allocVar = variableManager.receiveVariable(loopParameter, nextDescriptor.returnType!!.type, LLVMRegisterScope(), pointer =
-            nextDescriptor.returnType!!.pointer+1)
+            nextDescriptor.returnType!!.pointer + 1)
         variableManager.addVariable(loopParameter, allocVar, scopeDepth + 1)
         codeBuilder.allocStackVar(allocVar, pointer = true)
 
