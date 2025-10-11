@@ -1,10 +1,14 @@
-package org.kotlinnative.translator
+package org.kotlinnative.translator.codegens
 
 import org.jetbrains.kotlin.descriptors.ClassDescriptor
 import org.jetbrains.kotlin.descriptors.ClassKind
 import org.jetbrains.kotlin.psi.KtClass
 import org.jetbrains.kotlin.psi.KtParameter
 import org.jetbrains.kotlin.resolve.BindingContext
+import org.kotlinnative.translator.codegens.ObjectCodegen
+import org.kotlinnative.translator.codegens.StructCodegen
+import org.kotlinnative.translator.TranslationState
+import org.kotlinnative.translator.VariableManager
 import org.kotlinnative.translator.exceptions.TranslationException
 import org.kotlinnative.translator.llvm.LLVMBuilder
 import org.kotlinnative.translator.llvm.types.LLVMReferenceType
@@ -27,13 +31,21 @@ class ClassCodegen(state: TranslationState,
     override val type: LLVMReferenceType
 
     init {
-        type = LLVMReferenceType(structName, "class", align = TranslationState.POINTER_ALIGN, size = TranslationState.POINTER_SIZE, byRef = true)
-        descriptor = state.bindingContext.get(BindingContext.CLASS, clazz) ?: throw TranslationException("Can't receive descriptor of class " + clazz.name)
+        type = LLVMReferenceType(
+            structName,
+            "class",
+            align = TranslationState.Companion.POINTER_ALIGN,
+            size = TranslationState.Companion.POINTER_SIZE,
+            byRef = true
+        )
+        descriptor = state.bindingContext.get(BindingContext.CLASS, clazz) ?: throw TranslationException(
+            "Can't receive descriptor of class " + clazz.name
+        )
 
         annotation = descriptor.kind == ClassKind.ANNOTATION_CLASS
         enum = descriptor.kind == ClassKind.ENUM_CLASS
 
-        type.align = TranslationState.POINTER_ALIGN
+        type.align = TranslationState.Companion.POINTER_ALIGN
     }
 
     override fun prepareForGenerate() {
@@ -52,7 +64,8 @@ class ClassCodegen(state: TranslationState,
 
         if (descriptor.companionObjectDescriptor != null) {
             val companionObject = clazz.getCompanionObjects().first()
-            companionObjectCodegen = ObjectCodegen(state, variableManager, companionObject, codeBuilder, this)
+            companionObjectCodegen =
+                ObjectCodegen(state, variableManager, companionObject, codeBuilder, this)
             companionObjectCodegen!!.prepareForGenerate()
         }
     }
@@ -72,10 +85,11 @@ class ClassCodegen(state: TranslationState,
             return
         }
 
-        val currentConstructorFields = parameters.mapIndexed { i, it -> resolveType(it, state.bindingContext.get(BindingContext.TYPE, it.typeReference)!!, fields.size + i) }
+        val currentConstructorFields = parameters.mapIndexed { i, it -> resolveType(it, state.bindingContext.get(
+            BindingContext.TYPE, it.typeReference)!!, fields.size + i) }
         fields.addAll(currentConstructorFields)
         fieldsIndex.putAll(currentConstructorFields.map { Pair(it.label, it) })
-        primaryConstructorIndex = LLVMType.mangleFunctionArguments(currentConstructorFields)
+        primaryConstructorIndex = LLVMType.Companion.mangleFunctionArguments(currentConstructorFields)
         constructorFields.put(primaryConstructorIndex!!, currentConstructorFields)
     }
 }

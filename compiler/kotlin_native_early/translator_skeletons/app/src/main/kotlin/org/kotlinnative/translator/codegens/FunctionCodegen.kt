@@ -1,4 +1,4 @@
-package org.kotlinnative.translator
+package org.kotlinnative.translator.codegens
 
 import org.jetbrains.kotlin.psi.KtExpression
 import org.jetbrains.kotlin.psi.KtFile
@@ -8,18 +8,29 @@ import org.jetbrains.kotlin.psi.psiUtil.isExtensionDeclaration
 import org.jetbrains.kotlin.resolve.BindingContext
 import org.jetbrains.kotlin.resolve.descriptorUtil.fqNameSafe
 import org.jetbrains.kotlin.resolve.source.KotlinSourceElement
-import org.kotlinnative.translator.llvm.*
+import org.kotlinnative.translator.TranslationState
+import org.kotlinnative.translator.VariableManager
+import org.kotlinnative.translator.llvm.LLVMBuilder
+import org.kotlinnative.translator.llvm.LLVMFunctionDescriptor
+import org.kotlinnative.translator.llvm.LLVMInstanceOfStandardType
+import org.kotlinnative.translator.llvm.LLVMMapStandardType
+import org.kotlinnative.translator.llvm.LLVMRegisterScope
+import org.kotlinnative.translator.llvm.LLVMVariable
+import org.kotlinnative.translator.llvm.addAfterIfNotEmpty
 import org.kotlinnative.translator.llvm.types.LLVMFunctionType
 import org.kotlinnative.translator.llvm.types.LLVMReferenceType
 import org.kotlinnative.translator.llvm.types.LLVMType
 import org.kotlinnative.translator.llvm.types.LLVMVoidType
-import java.util.*
-
+import java.util.ArrayList
+import java.util.HashMap
+import java.util.LinkedList
+import kotlin.collections.forEach
 
 class FunctionCodegen(state: TranslationState,
                       variableManager: VariableManager,
                       val function: KtNamedFunction,
-                      codeBuilder: LLVMBuilder) :
+                      codeBuilder: LLVMBuilder
+) :
     BlockCodegen(state, variableManager, codeBuilder) {
 
     var name: String
@@ -34,7 +45,11 @@ class FunctionCodegen(state: TranslationState,
     init {
         val descriptor = state.bindingContext.get(BindingContext.FUNCTION, function)!!
         args.addAll(descriptor.valueParameters.map {
-            LLVMInstanceOfStandardType(it?.fqNameSafe?.asString() ?: it.name.toString(), it.type, state = state)
+            LLVMInstanceOfStandardType(
+                it?.fqNameSafe?.asString() ?: it.name.toString(),
+                it.type,
+                state = state
+            )
         })
 
         returnType = LLVMInstanceOfStandardType("instance", descriptor.returnType!!, state = state)
@@ -42,16 +57,18 @@ class FunctionCodegen(state: TranslationState,
             returnType!!.pointer = 2
         }
         external = descriptor.isExternal
-        name = "${function.fqName}${if (!external) LLVMType.mangleFunctionArguments(args) else ""}"
+        name = "${function.fqName}${if (!external) LLVMType.Companion.mangleFunctionArguments(args) else ""}"
 
         if (isExtensionDeclaration) {
-            name = "${function.name}${if (!external) LLVMType.mangleFunctionArguments(args) else ""}"
+            name = "${function.name}${if (!external) LLVMType.Companion.mangleFunctionArguments(args) else ""}"
             val receiverType = descriptor.extensionReceiverParameter!!.type
             val translatorType = LLVMMapStandardType(receiverType, state)
             val packageName = (function.containingFile as KtFile).packageFqName.asString()
             functionNamePrefix = packageName.addAfterIfNotEmpty(".") + translatorType.mangle + "."
 
-            val extensionFunctionsOfThisType = state.extensionFunctions.getOrDefault(translatorType.toString(), HashMap())
+            val extensionFunctionsOfThisType = state.extensionFunctions.getOrDefault(translatorType.toString(),
+                HashMap()
+            )
             extensionFunctionsOfThisType.put(fullName, this)
             state.extensionFunctions.put(translatorType.toString(), extensionFunctionsOfThisType)
         }
@@ -99,7 +116,11 @@ class FunctionCodegen(state: TranslationState,
             val translatorType = LLVMMapStandardType(receiverType, state)
 
             val classVal = when (translatorType) {
-                is LLVMReferenceType -> LLVMVariable("classvariable.this", translatorType, pointer = 1)
+                is LLVMReferenceType -> LLVMVariable(
+                    "classvariable.this",
+                    translatorType,
+                    pointer = 1
+                )
                 else -> LLVMVariable("type", translatorType, pointer = 0)
             }
 
@@ -113,22 +134,37 @@ class FunctionCodegen(state: TranslationState,
 
         actualArgs.addAll(args)
 
-        codeBuilder.addLLVMCodeToLocalPlace(LLVMFunctionDescriptor(fullName, actualArgs, actualReturnType, external))
+        codeBuilder.addLLVMCodeToLocalPlace(
+            LLVMFunctionDescriptor(
+                fullName,
+                actualArgs,
+                actualReturnType,
+                external
+            )
+        )
     }
 
     private fun generateLoadArguments() {
         args.forEach(fun(it: LLVMVariable) {
             if (it.type is LLVMFunctionType || (it.type is LLVMReferenceType && it.type.byRef)) {
-                variableManager.addVariable(it.label, LLVMVariable(it.label, it.type, it.label, LLVMRegisterScope(), pointer = 1), topLevelScopeDepth)
+                variableManager.addVariable(it.label,
+                    LLVMVariable(it.label, it.type, it.label, LLVMRegisterScope(), pointer = 1), topLevelScopeDepth)
                 return
             }
 
             if (it.type !is LLVMReferenceType || it.type.byRef) {
-                val loadVariable = LLVMVariable(it.label, it.type, it.label, LLVMRegisterScope(), pointer = it.pointer)
+                val loadVariable = LLVMVariable(
+                    it.label,
+                    it.type,
+                    it.label,
+                    LLVMRegisterScope(),
+                    pointer = it.pointer
+                )
                 val allocVar = codeBuilder.loadArgument(loadVariable)
                 variableManager.addVariable(it.label, allocVar, topLevelScopeDepth)
             } else {
-                variableManager.addVariable(it.label, LLVMVariable(it.label, it.type, it.label, LLVMRegisterScope(), pointer = 0), topLevelScopeDepth)
+                variableManager.addVariable(it.label,
+                    LLVMVariable(it.label, it.type, it.label, LLVMRegisterScope(), pointer = 0), topLevelScopeDepth)
             }
         })
     }

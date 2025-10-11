@@ -19,6 +19,10 @@ import org.jetbrains.kotlin.config.CompilerConfiguration
 import org.jetbrains.kotlin.config.JVMConfigurationKeys
 import org.jetbrains.kotlin.ir.backend.jvm.jvmResolveLibraries
 import org.jetbrains.kotlin.resolve.BindingContext
+import org.kotlinnative.translator.codegens.ClassCodegen
+import org.kotlinnative.translator.codegens.FunctionCodegen
+import org.kotlinnative.translator.codegens.ObjectCodegen
+import org.kotlinnative.translator.codegens.PropertyCodegen
 import org.kotlinnative.translator.exceptions.TranslationException
 import org.kotlinnative.translator.llvm.LLVMBuilder
 import org.kotlinnative.translator.llvm.LLVMVariable

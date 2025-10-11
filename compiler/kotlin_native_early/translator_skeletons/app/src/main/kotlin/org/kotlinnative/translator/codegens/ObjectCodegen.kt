@@ -1,7 +1,10 @@
-package org.kotlinnative.translator
+package org.kotlinnative.translator.codegens
 
 import org.jetbrains.kotlin.psi.KtObjectDeclaration
 import org.jetbrains.kotlin.resolve.BindingContext
+import org.kotlinnative.translator.codegens.StructCodegen
+import org.kotlinnative.translator.TranslationState
+import org.kotlinnative.translator.VariableManager
 import org.kotlinnative.translator.llvm.LLVMBuilder
 import org.kotlinnative.translator.llvm.LLVMVariable
 import org.kotlinnative.translator.llvm.LLVMVariableScope
@@ -19,7 +22,7 @@ class ObjectCodegen(state: TranslationState,
     override val type = LLVMReferenceType(structName, "class")
 
     init {
-        primaryConstructorIndex = LLVMType.mangleFunctionArguments(emptyList())
+        primaryConstructorIndex = LLVMType.Companion.mangleFunctionArguments(emptyList())
         constructorFields.put(primaryConstructorIndex!!, arrayListOf())
     }
 
@@ -29,7 +32,13 @@ class ObjectCodegen(state: TranslationState,
 
         super.prepareForGenerate()
 
-        val classInstance = LLVMVariable("object.instance.$structName", type, objectDeclaration.name, LLVMVariableScope(), pointer = 1)
+        val classInstance = LLVMVariable(
+            "object.instance.$structName",
+            type,
+            objectDeclaration.name,
+            LLVMVariableScope(),
+            pointer = 1
+        )
         codeBuilder.addGlobalInitialize(classInstance, fields, initializedFields.map {
             val type = state.bindingContext.get(BindingContext.EXPRESSION_TYPE_INFO, it.value)!!.type!!
             Pair(it.key, state.bindingContext.get(BindingContext.COMPILE_TIME_VALUE, it.value)!!.getValue(type).toString())

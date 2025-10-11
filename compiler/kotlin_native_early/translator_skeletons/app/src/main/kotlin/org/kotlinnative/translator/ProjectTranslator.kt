@@ -1,6 +1,10 @@
 package org.kotlinnative.translator
 
 import org.jetbrains.kotlin.psi.*
+import org.kotlinnative.translator.codegens.ClassCodegen
+import org.kotlinnative.translator.codegens.FunctionCodegen
+import org.kotlinnative.translator.codegens.ObjectCodegen
+import org.kotlinnative.translator.codegens.PropertyCodegen
 
 class ProjectTranslator(val files: List<KtFile>,
                         val state: TranslationState) {
@@ -20,7 +24,8 @@ class ProjectTranslator(val files: List<KtFile>,
     fun addFunctionDeclarations(file: KtFile) {
         val variableManager = VariableManager(state.globalVariableCollection)
         for (declaration in file.declarations.filter { it is KtNamedFunction }) {
-            val function = FunctionCodegen(state, variableManager, declaration as KtNamedFunction, codeBuilder)
+            val function =
+                FunctionCodegen(state, variableManager, declaration as KtNamedFunction, codeBuilder)
             if (function.external) {
                 state.externalFunctions.put(function.fullName, function)
             } else {
@@ -40,7 +45,8 @@ class ProjectTranslator(val files: List<KtFile>,
     fun addPropertyDeclarations(file: KtFile) {
         val variableManager = VariableManager(state.globalVariableCollection)
         for (declaration in file.declarations.filter { it is KtProperty }) {
-            val property = PropertyCodegen(state, variableManager, declaration as KtProperty, codeBuilder)
+            val property =
+                PropertyCodegen(state, variableManager, declaration as KtProperty, codeBuilder)
             state.properties.put(declaration.name!!, property)
         }
     }
@@ -48,7 +54,12 @@ class ProjectTranslator(val files: List<KtFile>,
     fun addObjectDeclarations(file: KtFile) {
         val variableManager = VariableManager(state.globalVariableCollection)
         for (declaration in file.declarations.filter { it is KtObjectDeclaration }) {
-            val codegen = ObjectCodegen(state, variableManager, declaration as KtObjectDeclaration, codeBuilder)
+            val codegen = ObjectCodegen(
+                state,
+                variableManager,
+                declaration as KtObjectDeclaration,
+                codeBuilder
+            )
             state.objects.put(codegen.structName, codegen)
         }
     }
