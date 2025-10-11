@@ -4,7 +4,7 @@ import org.kotlinnative.translator.llvm.LLVMExpression
 import org.kotlinnative.translator.llvm.LLVMSingleValue
 import org.kotlinnative.translator.llvm.LLVMVariable
 
-class LLVMShortType() : LLVMType() {
+class LLVMShortType() : LLVMType("kotlin") {
     override fun toString(): String = "i16"
     override val align: Int = 2
     override var size: Int = 2

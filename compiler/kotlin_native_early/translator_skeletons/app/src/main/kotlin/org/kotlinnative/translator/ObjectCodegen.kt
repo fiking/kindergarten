@@ -12,10 +12,11 @@ class ObjectCodegen(state: TranslationState,
                     variableManager: VariableManager,
                     val objectDeclaration: KtObjectDeclaration,
                     codeBuilder: LLVMBuilder,
+                    packageName: String,
                     parentCodegen: StructCodegen? = null) :
-    StructCodegen(state, variableManager, objectDeclaration, codeBuilder, parentCodegen = parentCodegen) {
+    StructCodegen(state, variableManager, objectDeclaration, codeBuilder, packageName, parentCodegen) {
     override var size: Int = 0
-    override var structName: String = objectDeclaration.name!!
+    override val structName: String = objectDeclaration.fqName?.asString()!!
     override val type: LLVMReferenceType = LLVMReferenceType(structName, "class", align = TranslationState.pointerAlign, size = TranslationState.pointerSize, byRef = true)
 
     init {
@@ -25,13 +26,13 @@ class ObjectCodegen(state: TranslationState,
         }
         primaryConstructorIndex = LLVMType.mangleFunctionArguments(emptyList())
         constructorFields.put(primaryConstructorIndex!!, arrayListOf())
+    }
+    override fun prepareForGenerate() {
         generateInnerFields(objectDeclaration.declarations)
         calculateTypeSize()
         type.size = size
         type.align = TranslationState.pointerAlign
-    }
 
-    override fun prepareForGenerate() {
         super.prepareForGenerate()
 
         val classInstance = LLVMVariable("object.instance.$fullName", type, objectDeclaration.name, LLVMVariableScope(), pointer = 1)

@@ -11,10 +11,12 @@ import org.jetbrains.kotlin.psi.KtEnumEntry
 import org.jetbrains.kotlin.psi.KtExpression
 import org.jetbrains.kotlin.psi.KtNamedDeclaration
 import org.jetbrains.kotlin.psi.KtNamedFunction
+import org.jetbrains.kotlin.psi.KtParameter
 import org.jetbrains.kotlin.psi.KtProperty
 import org.jetbrains.kotlin.psi.KtSecondaryConstructor
 import org.jetbrains.kotlin.psi.KtSuperTypeCallEntry
 import org.jetbrains.kotlin.resolve.BindingContext
+import org.jetbrains.kotlin.resolve.descriptorUtil.fqNameSafe
 import org.jetbrains.kotlin.types.KotlinType
 import org.kotlinnative.translator.llvm.LLVMBuilder
 import org.kotlinnative.translator.llvm.LLVMClassVariable
@@ -32,6 +34,7 @@ abstract class StructCodegen(val state: TranslationState,
                              val variableManager: VariableManager,
                              val classOrObject: KtClassOrObject,
                              val codeBuilder: LLVMBuilder,
+                             val packageName: String,
                              val parentCodegen: StructCodegen? = null) {
     val fields = ArrayList<LLVMVariable>()
     val fieldsIndex = HashMap<String, LLVMClassVariable>()
@@ -43,9 +46,9 @@ abstract class StructCodegen(val state: TranslationState,
     abstract val type: LLVMReferenceType
     abstract var size: Int
     var methods = HashMap<String, FunctionCodegen>()
-    abstract var structName: String
+    abstract val structName: String
     val fullName: String
-        get() = "${if (type.location.size > 0) "${type.location.joinToString(".")}." else ""}$structName"
+        get() = structName
 
     open fun prepareForGenerate() {
         generateStruct()
@@ -53,7 +56,7 @@ abstract class StructCodegen(val state: TranslationState,
         for (declaration in classOrObject.declarations) {
             when (declaration) {
                 is KtNamedFunction -> {
-                    val function = FunctionCodegen(state, variableManager, declaration, codeBuilder, this)
+                    val function = FunctionCodegen(state, variableManager, declaration, codeBuilder, packageName, this)
                     methods.put(function.name, function)
                 }
             }
@@ -99,11 +102,11 @@ abstract class StructCodegen(val state: TranslationState,
                     enumFields.put(name, field)
                 }
                 is KtClass -> {
-                    nestedClasses.put(declaration.name!!,
+                    nestedClasses.put(declaration.fqName!!.asString(),
                         ClassCodegen(state,
                             VariableManager(state.globalVariableCollection),
                             declaration, codeBuilder,
-                            this))
+                            packageName, this))
                 }
             }
         }
@@ -159,7 +162,7 @@ abstract class StructCodegen(val state: TranslationState,
         variableManager.addVariable("this", classVal, 0)
 
         val secondaryConstructorArguments = descriptor!!.valueParameters.map {
-            LLVMInstanceOfStandardType(it.name.toString(), it.type, state = state)
+            LLVMInstanceOfStandardType(it.fqNameSafe.asString().replace(".<init>", ""), it.type, state = state)
         }
 
         argFields.add(classVal)
@@ -242,20 +245,19 @@ abstract class StructCodegen(val state: TranslationState,
 
     protected fun resolveType(field: KtNamedDeclaration, ktType: KotlinType): LLVMClassVariable {
         val annotations = parseFieldAnnotations(field)
+        val fieldName = state.bindingContext?.get(BindingContext.VALUE_PARAMETER, field as? KtParameter)?.fqNameSafe?.asString()?.replace(".<init>", "")
+            ?: field.fqName?.asString() ?: field.name!!
 
-        val result = LLVMInstanceOfStandardType(field.name!!, ktType, LLVMRegisterScope(), state = state)
+        val result = LLVMInstanceOfStandardType(fieldName, ktType, LLVMRegisterScope(), state = state)
 
         if (result.type is LLVMReferenceType) {
             val type = result.type as LLVMReferenceType
             type.prefix = "class"
             type.byRef = true
-
-            val location = ktType.getSubtypesPredicate().toString().split(".").dropLast(1)
-            type.location.addAll(location)
         }
 
         if (state.classes.containsKey(field.name!!)) {
-            return LLVMClassVariable(result.label, state.classes[field.name!!]!!.type, result.pointer)
+            return LLVMClassVariable(result.label, state.classes[fieldName]!!.type, result.pointer)
         }
 
         if (annotations.contains("Plain")) {

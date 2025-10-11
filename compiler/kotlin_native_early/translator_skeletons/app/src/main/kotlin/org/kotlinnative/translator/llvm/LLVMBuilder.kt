@@ -263,7 +263,7 @@ class LLVMBuilder(val arm: Boolean = false) {
     }
 
     fun addFunctionCall(functionName: LLVMVariable, arguments: List<LLVMVariable>) {
-        localCode.appendln("call ${functionName.type} $functionName(${arguments.joinToString { it -> "${it.type} $it" }})")
+        localCode.appendLine("call ${functionName.type} $functionName(${arguments.joinToString { it -> "${it.type} $it" }})")
     }
 
     fun loadArgumentIfRequired(value: LLVMSingleValue, argument: LLVMVariable): LLVMSingleValue {
@@ -296,4 +296,12 @@ class LLVMBuilder(val arm: Boolean = false) {
         names.mapIndexed(fun(i: Int, value: LLVMSingleValue): LLVMSingleValue {
             return loadArgumentIfRequired(value, args[i])
         }).toList()
+
+    fun declareEntryPoint(name: String) {
+        localCode.appendLine("define weak void @main()")
+        addStartExpression()
+        addFunctionCall(LLVMVariable(name, LLVMVoidType(), scope = LLVMVariableScope()), listOf())
+        addAnyReturn(LLVMVoidType())
+        addEndExpression()
+    }
 }
