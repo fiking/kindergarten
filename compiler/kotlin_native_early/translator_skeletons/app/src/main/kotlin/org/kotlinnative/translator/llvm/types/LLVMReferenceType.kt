@@ -8,8 +8,7 @@ class LLVMReferenceType(val type: String,
                         var prefix: String = "",
                         override var align: Int = TranslationState.pointerAlign,
                         override var size: Int = TranslationState.pointerSize,
-                        packageName: String = "",
-                        var byRef: Boolean = true) : LLVMReferred, LLVMType(packageName) {
+                        var byRef: Boolean = true) : LLVMReferred, LLVMType() {
     override val typename: String
         get() = "$prefix${if (prefix.length > 0) "." else ""}" +
                 "$type"

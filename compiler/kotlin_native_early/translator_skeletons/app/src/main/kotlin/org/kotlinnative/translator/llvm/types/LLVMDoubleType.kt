@@ -4,7 +4,7 @@ import org.kotlinnative.translator.llvm.LLVMExpression
 import org.kotlinnative.translator.llvm.LLVMSingleValue
 import org.kotlinnative.translator.llvm.LLVMVariable
 
-class LLVMDoubleType() : LLVMType("kotlin") {
+class LLVMDoubleType() : LLVMType() {
     override fun toString(): String = "double"
     override val align: Int = 8
     override var size: Int = 8

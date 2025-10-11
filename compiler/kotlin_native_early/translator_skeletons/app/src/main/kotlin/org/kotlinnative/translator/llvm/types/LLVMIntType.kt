@@ -4,7 +4,7 @@ import org.kotlinnative.translator.exceptions.UnimplementedException
 import org.kotlinnative.translator.llvm.LLVMExpression
 import org.kotlinnative.translator.llvm.LLVMSingleValue
 
-class LLVMIntType() : LLVMType("kotlin") {
+class LLVMIntType() : LLVMType() {
     override fun toString(): String = "i32"
     override val align: Int = 4
     override var size: Int = 4
