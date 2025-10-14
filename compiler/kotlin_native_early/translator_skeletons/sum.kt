@@ -2,18 +2,19 @@ class MyClass(val a: Int) {
   fun Add() {}
 }
 
-fun readClassField() {
-  var value = MyClass()
+fun readClassField() : Int {
+  var value = MyClass(2)
   var rst = value.Add()
   return value.a
 }
 
-fun ifTest() {
+fun ifTest() : Int {
   val a = 2;
   val b = 3;
   if (a > b) {
     return a
   }
+    return b
 }
 
 fun classConstruct() {
@@ -21,17 +22,19 @@ fun classConstruct() {
   val clazz = MyClass(a)
 }
 
-fun cmp() {
+fun cmp() : Boolean {
   val a = 2;
   val b = 3;
   val c = a == b
   return c
 }
 
-fun callee(val a: Int, val b: Int) {
+fun callee(a: Int, b: Int) {
 }
 
-fun sum(val a: Int, val b: Int) : Int {
+
+fun sum(a: Int, b: Int) : Int {
 //  val c = callee(a, b)
   return 2 + 3;
 }
+

@@ -10,10 +10,13 @@ import org.jetbrains.kotlin.cli.common.messages.CompilerMessageSourceLocation
 import org.jetbrains.kotlin.cli.common.messages.MessageCollector
 import org.jetbrains.kotlin.cli.common.toLogger
 import org.jetbrains.kotlin.cli.jvm.compiler.EnvironmentConfigFiles
+import org.jetbrains.kotlin.cli.jvm.compiler.JvmPackagePartProvider
 import org.jetbrains.kotlin.cli.jvm.compiler.KotlinCoreEnvironment
 import org.jetbrains.kotlin.cli.jvm.compiler.KotlinToJVMBytecodeCompiler
 import org.jetbrains.kotlin.cli.jvm.compiler.NoScopeRecordCliBindingTrace
 import org.jetbrains.kotlin.cli.jvm.compiler.TopDownAnalyzerFacadeForJVM
+import org.jetbrains.kotlin.cli.jvm.config.addJvmClasspathRoot
+import org.jetbrains.kotlin.cli.jvm.config.configureJdkClasspathRoots
 import org.jetbrains.kotlin.config.CommonConfigurationKeys
 import org.jetbrains.kotlin.config.CompilerConfiguration
 import org.jetbrains.kotlin.config.JVMConfigurationKeys
@@ -26,6 +29,7 @@ import org.kotlinnative.translator.codegens.PropertyCodegen
 import org.kotlinnative.translator.exceptions.TranslationException
 import org.kotlinnative.translator.llvm.LLVMBuilder
 import org.kotlinnative.translator.llvm.LLVMVariable
+import java.io.File
 
 class TranslationState
 private constructor
@@ -79,6 +83,13 @@ private constructor
             }
             configuration.put(CLIConfigurationKeys.MESSAGE_COLLECTOR_KEY, messageCollector)
             configuration.put(CommonConfigurationKeys.MODULE_NAME, "benchmark")
+            val RUNTIME_JAR = File(
+                System.getProperty("kotlin.runtime.path") ?: "/Users/bytedance/.gradle/caches/modules-2/files-2.1/org.jetbrains.kotlin/kotlin-compiler/1.9.0/1b80b7d3dc77f12a52893f25c502f380705ad55d/kotlin-compiler-1.9.0.jar"
+            )
+            val JDK_PATH = File("/Users/bytedance/.gradle/jdks/azul_systems__inc_-8-aarch64-os_x.2/zulu-8.jdk/Contents/Home/jre/lib/rt.jar")
+            configuration.addJvmClasspathRoot(JDK_PATH)
+            configuration.addJvmClasspathRoot(RUNTIME_JAR)
+            configuration.configureJdkClasspathRoots()
             configuration.addKotlinSourceRoots(sources)
 
             val environment = KotlinCoreEnvironment.createForProduction(

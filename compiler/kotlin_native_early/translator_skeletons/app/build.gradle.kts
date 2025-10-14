@@ -35,7 +35,6 @@ dependencies {
 
     implementation("org.jetbrains.kotlin:kotlin-compiler:1.9.0")
     implementation("org.jetbrains.kotlin:kotlin-stdlib:1.9.0")
-    implementation("org.jetbrains.kotlin:kotlin-runtime:1.0.2")
     implementation("com.github.jshmrsn:karg:a636b3e")
 }
 
