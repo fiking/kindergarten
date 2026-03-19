@@ -1,0 +1,25 @@
+# 本地LLVM配置文件
+# 此文件定义本地LLVM源码的路径
+
+# LLVM项目主目录
+LLVM_PROJECT_DIR=/Users/bytedance/code/ArtificialIntelligence/compiler/llvm-project
+
+# LLVM构建目录（通常在 LLVM_PROJECT_DIR/build）
+LLVM_BUILD_DIR=${LLVM_PROJECT_DIR}/build
+
+# LLVM CMake配置目录
+LLVM_CMAKE_DIR=${LLVM_BUILD_DIR}/lib/cmake/llvm
+
+# LLVM二进制工具目录
+LLVM_BIN_DIR=${LLVM_BUILD_DIR}/bin
+
+# LLVM库目录
+LLVM_LIB_DIR=${LLVM_BUILD_DIR}/lib
+
+# LLVM包含文件目录
+LLVM_INCLUDE_DIR=${LLVM_PROJECT_DIR}/llvm/include:${LLVM_BUILD_DIR}/include
+
+# 导出环境变量（可选）
+# export DYLD_LIBRARY_PATH=${LLVM_LIB_DIR}:$DYLD_LIBRARY_PATH
+# export LD_LIBRARY_PATH=${LLVM_LIB_DIR}:$LD_LIBRARY_PATH
+# export PATH=${LLVM_BIN_DIR}:$PATH
