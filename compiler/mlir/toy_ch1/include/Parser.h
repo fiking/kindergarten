@@ -280,38 +280,47 @@ private:
   /// block_expr ::= decl | "return" | expression
   std::unique_ptr<ExprASTList> parseBlock() {
     if (lexer.getCurToken() != '{')
-      return parseError<ExprASTList>("'{'", "to start block");
+      return parseError<ExprASTList>("{", "to begin block");
     lexer.consume(Token('{'));
 
     auto exprList = std::make_unique<ExprASTList>();
 
+    // Ignore empty expressions: swallow sequences of semicolons.
     while (lexer.getCurToken() == ';')
       lexer.consume(Token(';'));
 
     while (lexer.getCurToken() != '}' && lexer.getCurToken() != tok_eof) {
       if (lexer.getCurToken() == tok_var) {
+        // Variable declaration
         auto varDecl = parseDeclaration();
         if (!varDecl)
           return nullptr;
         exprList->push_back(std::move(varDecl));
       } else if (lexer.getCurToken() == tok_return) {
+        // Return statement
         auto ret = parseReturn();
         if (!ret)
           return nullptr;
         exprList->push_back(std::move(ret));
       } else {
+        // General expression
         auto expr = parseExpression();
         if (!expr)
           return nullptr;
         exprList->push_back(std::move(expr));
       }
+      // Ensure that elements are separated by a semicolon.
+      if (lexer.getCurToken() != ';')
+        return parseError<ExprASTList>(";", "after expression");
 
-      while (lexer.getCurToken() != '}')
+      // Ignore empty expressions: swallow sequences of semicolons.
+      while (lexer.getCurToken() == ';')
         lexer.consume(Token(';'));
     }
 
     if (lexer.getCurToken() != '}')
-      return parseError<ExprASTList>("'}'", "to end block");
+      return parseError<ExprASTList>("}", "to close block");
+
     lexer.consume(Token('}'));
     return exprList;
   }
@@ -320,18 +329,19 @@ private:
   /// decl_list ::= identifier | identifier, decl_list
   std::unique_ptr<PrototypeAST> parsePrototype() {
     auto loc = lexer.getLastLocation();
+
     if (lexer.getCurToken() != tok_def)
-      return parseError<PrototypeAST>("'def'", "to start function definition");
+      return parseError<PrototypeAST>("def", "in prototype");
     lexer.consume(tok_def);
 
     if (lexer.getCurToken() != tok_identifier)
-      return parseError<PrototypeAST>("function name", "in function definition");
+      return parseError<PrototypeAST>("function name", "in prototype");
 
     std::string fnName(lexer.getId());
     lexer.consume(tok_identifier);
 
     if (lexer.getCurToken() != '(')
-      return parseError<PrototypeAST>("'('", "in function definition");
+      return parseError<PrototypeAST>("(", "in prototype");
     lexer.consume(Token('('));
 
     std::vector<std::unique_ptr<VariableExprAST>> args;
@@ -340,18 +350,20 @@ private:
         std::string name(lexer.getId());
         auto loc = lexer.getLastLocation();
         lexer.consume(tok_identifier);
-        auto decl = std::make_unique<VariableExprAST>(std::move(loc), std::move(name));
+        auto decl = std::make_unique<VariableExprAST>(std::move(loc), name);
         args.push_back(std::move(decl));
-        if (lexer.getCurToken() == ',')
+        if (lexer.getCurToken() != ',')
           break;
         lexer.consume(Token(','));
         if (lexer.getCurToken() != tok_identifier)
-          return parseError<PrototypeAST>("identifier", "in function argument list");
+          return parseError<PrototypeAST>(
+              "identifier", "after ',' in function parameter list");
       } while (true);
     }
-
     if (lexer.getCurToken() != ')')
       return parseError<PrototypeAST>(")", "to end function prototype");
+
+    // success.
     lexer.consume(Token(')'));
     return std::make_unique<PrototypeAST>(std::move(loc), fnName,
                                           std::move(args));
