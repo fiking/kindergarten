@@ -4,6 +4,9 @@ project(SimpleLLVMCompiler)
 set(CMAKE_CXX_STANDARD 14)
 set(CMAKE_CXX_STANDARD_REQUIRED ON)
 
+set(NO_RTTI "-fno-rtti")
+add_definitions(${NO_RTTI})
+
 # 本地LLVM源码路径
 set(LOCAL_LLVM_PROJECT_DIR "/Users/bytedance/code/ArtificialIntelligence/compiler/llvm-project")
 
@@ -38,15 +41,8 @@ add_definitions(${LLVM_DEFINITIONS} ${MLIR_DEFINITIONS})
 # 获取LLVM库和编译标志
 llvm_map_components_to_libnames(llvm_libs core)
 
-# 获取MLIR库
-set(MLIR_LIBS
-    MLIRSupport
-    MLIRIR
-    MLIRTransforms
-)
-
 # 可执行文件
 add_executable(compiler main.cpp AST.cpp)
 
 # 链接LLVM库、MLIR库和系统库
-target_link_libraries(compiler ${llvm_libs} ${MLIR_LIBS} pthread dl m)
+target_link_libraries(compiler PRIVATE ${llvm_libs} MLIRIR MLIRSupport pthread)
