@@ -19,12 +19,6 @@ if(NOT MLIR_DIR)
     message(STATUS "Using local MLIR from: ${LOCAL_LLVM_PROJECT_DIR}")
 endif()
 
-# 如果未指定MLIR_DIR，使用本地MLIR
-if(NOT MLIR_DIR)
-    set(MLIR_DIR "${LOCAL_LLVM_PROJECT_DIR}/build/lib/cmake/mlir")
-    message(STATUS "Using local MLIR from: ${LOCAL_LLVM_PROJECT_DIR}")
-endif()
-
 # 查找LLVM
 find_package(LLVM REQUIRED CONFIG)
 
@@ -37,7 +31,8 @@ find_package(MLIR REQUIRED CONFIG)
 message(STATUS "Found MLIR ${MLIR_PACKAGE_VERSION}")
 message(STATUS "Using MLIRConfig.cmake in: ${MLIR_DIR}")
 
-include_directories(${LLVM_INCLUDE_DIRS} ${MLIR_INCLUDE_DIRS})
+# 添加项目include目录
+include_directories(${CMAKE_CURRENT_SOURCE_DIR}/include ${LLVM_INCLUDE_DIRS} ${MLIR_INCLUDE_DIRS})
 add_definitions(${LLVM_DEFINITIONS} ${MLIR_DEFINITIONS})
 
 # 获取LLVM库和编译标志
@@ -51,7 +46,7 @@ set(MLIR_LIBS
 )
 
 # 可执行文件
-add_executable(compiler main.cpp)
+add_executable(compiler main.cpp AST.cpp)
 
 # 链接LLVM库、MLIR库和系统库
 target_link_libraries(compiler ${llvm_libs} ${MLIR_LIBS} pthread dl m)
