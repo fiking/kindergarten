@@ -53,4 +53,4 @@ add_executable(compiler main.cpp AST.cpp MLIRGen.cpp Dialect.cpp)
 add_dependencies(compiler ToyOpsIncGen)
 
 # 链接LLVM库、MLIR库和系统库
-target_link_libraries(compiler PRIVATE ${llvm_libs} MLIRIR MLIRSupport pthread)
+target_link_libraries(compiler PRIVATE ${llvm_libs} MLIRParser)
