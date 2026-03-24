@@ -40,13 +40,14 @@ llvm_map_components_to_libnames(llvm_libs core)
 
 # 添加项目include目录
 include_directories(${CMAKE_CURRENT_SOURCE_DIR}/include ${LLVM_INCLUDE_DIRS} ${MLIR_INCLUDE_DIRS})
+include_directories(${CMAKE_CURRENT_BINARY_DIR}/include/)
 add_definitions(${LLVM_DEFINITIONS} ${MLIR_DEFINITIONS})
 
 # 添加 include 子目录（包含 TableGen 构建规则）
 add_subdirectory(include)
 
 # 可执行文件
-add_executable(compiler main.cpp AST.cpp)
+add_executable(compiler main.cpp AST.cpp MLIRGen.cpp Dialect.cpp)
 
 # 添加对 TableGen 生成文件的依赖
 add_dependencies(compiler ToyOpsIncGen)
