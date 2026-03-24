@@ -29,6 +29,12 @@ find_package(MLIR REQUIRED CONFIG)
 message(STATUS "Found LLVM ${LLVM_PACKAGE_VERSION}")
 message(STATUS "Found MLIR ${MLIR_PACKAGE_VERSION}")
 
+list(APPEND CMAKE_MODULE_PATH "${MLIR_CMAKE_DIR}")
+list(APPEND CMAKE_MODULE_PATH "${LLVM_CMAKE_DIR}")
+include(TableGen)
+include(AddLLVM)
+include(AddMLIR)
+
 # 获取LLVM库和编译标志
 llvm_map_components_to_libnames(llvm_libs core)
 
@@ -36,8 +42,14 @@ llvm_map_components_to_libnames(llvm_libs core)
 include_directories(${CMAKE_CURRENT_SOURCE_DIR}/include ${LLVM_INCLUDE_DIRS} ${MLIR_INCLUDE_DIRS})
 add_definitions(${LLVM_DEFINITIONS} ${MLIR_DEFINITIONS})
 
+# 添加 include 子目录（包含 TableGen 构建规则）
+add_subdirectory(include)
+
 # 可执行文件
 add_executable(compiler main.cpp AST.cpp)
+
+# 添加对 TableGen 生成文件的依赖
+add_dependencies(compiler ToyOpsIncGen)
 
 # 链接LLVM库、MLIR库和系统库
 target_link_libraries(compiler PRIVATE ${llvm_libs} MLIRIR MLIRSupport pthread)
