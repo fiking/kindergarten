@@ -41,16 +41,21 @@ llvm_map_components_to_libnames(llvm_libs core)
 # 添加项目include目录
 include_directories(${CMAKE_CURRENT_SOURCE_DIR}/include ${LLVM_INCLUDE_DIRS} ${MLIR_INCLUDE_DIRS})
 include_directories(${CMAKE_CURRENT_BINARY_DIR}/include/)
+include_directories(${CMAKE_CURRENT_BINARY_DIR})
 add_definitions(${LLVM_DEFINITIONS} ${MLIR_DEFINITIONS})
 
 # 添加 include 子目录（包含 TableGen 构建规则）
 add_subdirectory(include)
 
+set(LLVM_TARGET_DEFINITIONS ToyCombine.td)
+mlir_tablegen(ToyCombine.inc -gen-rewriters)
+add_public_tablegen_target(ToyCombineIncGen)
+
 # 可执行文件
 add_executable(compiler main.cpp AST.cpp MLIRGen.cpp Dialect.cpp ToyCombine.cpp)
 
 # 添加对 TableGen 生成文件的依赖
-add_dependencies(compiler ToyOpsIncGen)
+add_dependencies(compiler ToyOpsIncGen ToyCombineIncGen)
 
 # 链接LLVM库、MLIR库和系统库
 target_link_libraries(compiler PRIVATE ${llvm_libs} MLIRParser MLIRPass MLIRTransforms)
