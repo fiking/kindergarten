@@ -7,6 +7,9 @@
 #include "mlir/IR/MLIRContext.h"
 #include "mlir/IR/Verifier.h"
 #include "mlir/Parser/Parser.h"
+#include "mlir/Pass/Pass.h"
+#include "mlir/Pass/PassManager.h"
+#include "mlir/Transforms/Passes.h"
 
 #include "llvm/ADT/StringRef.h"
 #include "llvm/Support/CommandLine.h"
@@ -37,6 +40,8 @@ static cl::opt<enum Action>
   emitAction("emit", cl::desc("Select the kind of output desired"),
              cl::values(clEnumValN(DumpAST, "ast", "Dump the AST of the input file"),
                         clEnumValN(DumpMLIR, "mlir", "output the MLIR dump")));
+
+static cl::opt<bool> enableOpt("opt", cl::desc("Enable optimizations"));
 
 namespace {
 enum InputType { Toy, MLIR };
@@ -89,6 +94,16 @@ int dumpMLIR() {
     if (!module)
       return 1;
 
+    if (enableOpt) {
+      mlir::PassManager pm(&context);
+      // Apply any generic pass manager command line options and run the pipeline.
+      applyPassManagerCLOptions(pm);
+
+      // Add a run of the canonicalizer to optimize the mlir module.
+      pm.addNestedPass<mlir::toy::FuncOp>(mlir::createCanonicalizerPass());
+      if (mlir::failed(pm.run(*module)))
+        return 4;
+    }
     module->dump();
     return 0;
   }
