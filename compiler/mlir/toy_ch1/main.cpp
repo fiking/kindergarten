@@ -99,6 +99,9 @@ int dumpMLIR() {
       // Apply any generic pass manager command line options and run the pipeline.
       applyPassManagerCLOptions(pm);
 
+      // Inline all functions into main and then delete them.
+      pm.addPass(mlir::createInlinerPass());
+
       // Add a run of the canonicalizer to optimize the mlir module.
       pm.addNestedPass<mlir::toy::FuncOp>(mlir::createCanonicalizerPass());
       if (mlir::failed(pm.run(*module)))
@@ -125,6 +128,20 @@ int dumpMLIR() {
     llvm::errs() << "Error can't load file " << inputFilename << "\n";
     return 3;
   }
+
+  if (enableOpt) {
+      mlir::PassManager pm(&context);
+      // Apply any generic pass manager command line options and run the pipeline.
+      applyPassManagerCLOptions(pm);
+
+      // Inline all functions into main and then delete them.
+      pm.addPass(mlir::createInlinerPass());
+
+      // Add a run of the canonicalizer to optimize the mlir module.
+      pm.addNestedPass<mlir::toy::FuncOp>(mlir::createCanonicalizerPass());
+      if (mlir::failed(pm.run(*module)))
+        return 4;
+    }
 
   module->dump();
   return 0;

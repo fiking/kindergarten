@@ -5,6 +5,8 @@ include "mlir/IR/OpBase.td"
 include "mlir/Interfaces/SideEffectInterfaces.td"
 include "mlir/IR/FunctionInterfaces.td"
 include "mlir/IR/SymbolInterfaces.td"
+include "mlir/Interfaces/CallInterfaces.td"
+include "mlir/Interfaces/CastInterfaces.td"
 
 #ifndef TOY_OPS_H
 #define TOY_OPS_H
@@ -78,6 +80,7 @@ def AddOp : Toy_Op<"add"> {
 }
 
 def FuncOp : Toy_Op<"func", [
+    DeclareOpInterfaceMethods<CallableOpInterface>,
     FunctionOpInterface, IsolatedFromAbove, Symbol
   ]> {
   let summary = "user defined function operation";
@@ -122,7 +125,8 @@ def FuncOp : Toy_Op<"func", [
   let skipDefaultBuilders = 1;
 }
 
-def GenericCallOp : Toy_Op<"generic_call"> {
+def GenericCallOp : Toy_Op<"generic_call",
+    [DeclareOpInterfaceMethods<CallOpInterface>]> {
   let summary = "generic call operation";
   let description = [{
     Generic calls represent calls to a user defined function that needs to
@@ -271,6 +275,30 @@ def TransposeOp : Toy_Op<"transpose", [NoSideEffect]> {
 
   // Enable registering canonicalization patterns with this operation.
   let hasCanonicalizer = 1;
+}
+
+//===----------------------------------------------------------------------===//
+// CastOp
+//===----------------------------------------------------------------------===//
+
+def CastOp : Toy_Op<"cast", [
+     DeclareOpInterfaceMethods<CastOpInterface>,
+     NoSideEffect,
+     SameOperandsAndResultShape
+  ]> {
+  let summary = "shape cast operation";
+  let description = [{
+    The "cast" operation converts a tensor from one type to an equivalent type
+    without changing any data elements. The source and destination types must
+    both be tensor types with the same element type. If both are ranked, then
+    shape is required to match. The operation is invalid if converting to a
+    mismatching constant dimension.
+  }];
+
+  let arguments = (ins F64Tensor:$input);
+  let results = (outs F64Tensor:$output);
+
+  let assemblyFormat = "$input attr-dict `:` type($input) `to` type($output)";
 }
 
 #endif // TOY_OPS_H
