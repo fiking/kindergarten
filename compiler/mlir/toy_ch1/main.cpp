@@ -172,6 +172,16 @@ int dumpMLIR() {
   if (isLoweringToAffine) {
     // Partially lower the toy dialect.
     pm.addPass(mlir::toy::createLowerToAffinePass());
+     // Add a few cleanups post lowering.
+    mlir::OpPassManager &optPM = pm.nest<mlir::func::FuncOp>();
+    optPM.addPass(mlir::createCanonicalizerPass());
+    optPM.addPass(mlir::createCSEPass());
+
+    // Add optimizations if enabled.
+    if (enableOpt) {
+      optPM.addPass(mlir::createLoopFusionPass());
+      optPM.addPass(mlir::createAffineScalarReplacementPass());
+    }
   }
 
   module->dump();
