@@ -277,6 +277,11 @@ int dumpMLIR() {
 }
 
 int main(int argc, char** argv) {
+  // Register any command line options.
+  mlir::registerAsmPrinterCLOptions();
+  mlir::registerMLIRContextCLOptions();
+  mlir::registerPassManagerCLOptions();
+
     cl::ParseCommandLineOptions(argc, argv, "Toy Compiler - Chapter 1\n");
     switch (emitAction) {
     case Action::DumpAST:
