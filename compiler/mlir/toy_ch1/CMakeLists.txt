@@ -65,6 +65,7 @@ add_executable(compiler
   ToyCombine.cpp
   ShapeInferencePass.cpp
   LowerToAffineLoops.cpp
+  LowerToLLVM.cpp
 )
 
 # 添加对 TableGen 生成文件的依赖

@@ -37,6 +37,7 @@ enum Action {
   DumpAST,
   DumpMLIR,
   DumpMLIRAffine,
+  DumpMLIRLLVM,
 };
 }
 
@@ -44,7 +45,8 @@ static cl::opt<enum Action>
   emitAction("emit", cl::desc("Select the kind of output desired"),
              cl::values(clEnumValN(DumpAST, "ast", "Dump the AST of the input file"),
                         clEnumValN(DumpMLIR, "mlir", "output the MLIR dump"),
-                        clEnumValN(DumpMLIRAffine, "affine", "output the MLIR dump after affine lowering")));
+                        clEnumValN(DumpMLIRAffine, "affine", "output the MLIR dump after affine lowering"),
+                        clEnumValN(DumpMLIRLLVM, "mlir-llvm", "output the MLIR dump after llvm lowering")));
 
 static cl::opt<bool> enableOpt("opt", cl::desc("Enable optimizations"));
 
@@ -88,6 +90,9 @@ int dumpAST() {
 int dumpMLIR() {
   mlir::MLIRContext context;
   context.getOrLoadDialect<mlir::toy::ToyDialect>();
+  // Check to see what granularity of MLIR we are compiling to.
+  bool isLoweringToAffine = emitAction >= Action::DumpMLIRAffine;
+  bool isLoweringToLLVM = emitAction >= Action::DumpMLIRLLVM;
 
   // Handle '.toy' input to the compiler.
   if (inputType != InputType::MLIR &&
@@ -99,8 +104,6 @@ int dumpMLIR() {
     if (!module)
       return 1;
 
-    // Check to see what granularity of MLIR we are compiling to.
-    bool isLoweringToAffine = emitAction >= Action::DumpMLIRAffine;
     mlir::PassManager pm(&context);
     if (enableOpt || isLoweringToAffine) {
       // Apply any generic pass manager command line options and run the pipeline.
@@ -129,6 +132,10 @@ int dumpMLIR() {
         optPM.addPass(mlir::createAffineScalarReplacementPass());
       }
     }
+    if (isLoweringToLLVM) {
+      // Finish lowering the toy IR to the LLVM dialect.
+      pm.addPass(mlir::toy::createLowerToLLVMPass());
+   }
     if (mlir::failed(pm.run(*module)))
       return 4;
     module->dump();
@@ -153,8 +160,6 @@ int dumpMLIR() {
     return 3;
   }
 
-  // Check to see what granularity of MLIR we are compiling to.
-  bool isLoweringToAffine = emitAction >= Action::DumpMLIRAffine;
   mlir::PassManager pm(&context);
 
   if (enableOpt || isLoweringToAffine) {
@@ -183,7 +188,10 @@ int dumpMLIR() {
       optPM.addPass(mlir::createAffineScalarReplacementPass());
     }
   }
-
+  if (isLoweringToLLVM) {
+    // Finish lowering the toy IR to the LLVM dialect.
+    pm.addPass(mlir::toy::createLowerToLLVMPass());
+  }
   module->dump();
   return 0;
 }
@@ -195,6 +203,7 @@ int main(int argc, char** argv) {
       return dumpAST();
     case Action::DumpMLIR:
     case Action::DumpMLIRAffine:
+    case Action::DumpMLIRLLVM:
       return dumpMLIR();
     default:
       llvm::errs() << "No action specified (parsing only?), use -emit=<action>\n";
