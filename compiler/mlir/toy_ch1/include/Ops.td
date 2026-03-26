@@ -7,6 +7,7 @@ include "mlir/IR/FunctionInterfaces.td"
 include "mlir/IR/SymbolInterfaces.td"
 include "mlir/Interfaces/CallInterfaces.td"
 include "mlir/Interfaces/CastInterfaces.td"
+include "ShapeInferenceInterface.td"
 
 #ifndef TOY_OPS_H
 #define TOY_OPS_H
@@ -60,7 +61,8 @@ def ConstantOp : Toy_Op<"constant", [NoSideEffect]> {
   let hasVerifier = 1;
 }
 
-def AddOp : Toy_Op<"add"> {
+def AddOp : Toy_Op<"add",
+    [NoSideEffect, DeclareOpInterfaceMethods<ShapeInferenceOpInterface>]> {
   let summary = "element-wise addition operation";
   let description = [{
     The "add" operation performs element-wise addition between two tensors.
@@ -161,7 +163,8 @@ def GenericCallOp : Toy_Op<"generic_call",
   ];
 }
 
-def MulOp : Toy_Op<"mul"> {
+def MulOp : Toy_Op<"mul",
+    [NoSideEffect, DeclareOpInterfaceMethods<ShapeInferenceOpInterface>]> {
   let summary = "element-wise multiplication operation";
   let description = [{
     The "mul" operation performs element-wise multiplication between two
@@ -255,7 +258,8 @@ def ReturnOp : Toy_Op<"return", [NoSideEffect, HasParent<"FuncOp">,
   let hasVerifier = 1;
 }
 
-def TransposeOp : Toy_Op<"transpose", [NoSideEffect]> {
+def TransposeOp : Toy_Op<"transpose",
+    [NoSideEffect, DeclareOpInterfaceMethods<ShapeInferenceOpInterface>]> {
   let summary = "transpose operation";
 
   let arguments = (ins F64Tensor:$input);
@@ -283,6 +287,7 @@ def TransposeOp : Toy_Op<"transpose", [NoSideEffect]> {
 
 def CastOp : Toy_Op<"cast", [
      DeclareOpInterfaceMethods<CastOpInterface>,
+     DeclareOpInterfaceMethods<ShapeInferenceOpInterface>,
      NoSideEffect,
      SameOperandsAndResultShape
   ]> {

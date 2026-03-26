@@ -8,6 +8,8 @@
 #include "mlir/Interfaces/SideEffectInterfaces.h"
 #include "mlir/Interfaces/CastInterfaces.h"
 
+#include "ShapeInferenceInterface.h"
+
 /// Include the auto-generated header file containing the declaration of the toy
 /// dialect.
 #include "Dialect.h.inc"

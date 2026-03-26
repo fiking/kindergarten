@@ -1,6 +1,7 @@
 #include "Dialect.h"
 #include "MLIRGen.h"
 #include "Parser.h"
+#include "Passes.h"
 
 #include "mlir/IR/AsmState.h"
 #include "mlir/IR/BuiltinOps.h"
@@ -102,8 +103,10 @@ int dumpMLIR() {
       // Inline all functions into main and then delete them.
       pm.addPass(mlir::createInlinerPass());
 
-      // Add a run of the canonicalizer to optimize the mlir module.
-      pm.addNestedPass<mlir::toy::FuncOp>(mlir::createCanonicalizerPass());
+      mlir::OpPassManager &optPM = pm.nest<mlir::toy::FuncOp>();
+      optPM.addPass(mlir::toy::createShapeInferencePass());
+      optPM.addPass(mlir::createCanonicalizerPass());
+      optPM.addPass(mlir::createCSEPass());
       if (mlir::failed(pm.run(*module)))
         return 4;
     }

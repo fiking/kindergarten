@@ -57,10 +57,10 @@ mlir_tablegen(ToyCombine.inc -gen-rewriters)
 add_public_tablegen_target(ToyCombineIncGen)
 
 # 可执行文件
-add_executable(compiler main.cpp AST.cpp MLIRGen.cpp Dialect.cpp ToyCombine.cpp)
+add_executable(compiler main.cpp AST.cpp MLIRGen.cpp Dialect.cpp ToyCombine.cpp ShapeInferencePass.cpp)
 
 # 添加对 TableGen 生成文件的依赖
-add_dependencies(compiler ToyOpsIncGen ToyCombineIncGen)
+add_dependencies(compiler ToyOpsIncGen ToyCombineIncGen ToyShapeInferenceInterfaceIncGen)
 
 # 链接LLVM库、MLIR库和系统库
 target_link_libraries(compiler PRIVATE ${llvm_libs} MLIRParser MLIRPass MLIRTransforms)
