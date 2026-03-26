@@ -32,3 +32,4 @@ fi
 echo "🚀 运行编译器..."
 echo ""
 $SCRIPT_DIR/build/compiler ~/code/ArtificialIntelligence/compiler/llvm-project/mlir/test/Examples/Toy/Ch2/codegen.toy -emit=mlir
+$SCRIPT_DIR/build/compiler ~/code/ArtificialIntelligence/compiler/llvm-project/mlir/test/Examples/Toy/Ch4/codegen.toy -emit=mlir -opt
