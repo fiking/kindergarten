@@ -1,0 +1,6 @@
+# Simple test: a + b
+def main() {
+  var a = 1.0;
+  var b = 2.0;
+  return a + b;
+}
