@@ -22,3 +22,6 @@ add_library(light SHARED ${SRC_FILES} ${ASM_FILE})
 # 添加测试用例
 add_executable(test_stackunwinder tests/test_stackunwinder.cpp)
 target_link_libraries(test_stackunwinder light)
+
+add_executable(test_forEachRefField tests/test_forEachRefField.cpp)
+target_link_libraries(test_forEachRefField light)
