@@ -15,6 +15,8 @@ class SubOp(BinaryOp):
     pass
 
 class MulOp(BinaryOp):
+    def format_str(self, lhs, rhs):
+        return '(%s * %s)' % (lhs, rhs)
     pass
 
 class DivOp(BinaryOp):
