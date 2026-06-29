@@ -1,3 +1,5 @@
+from __future__ import absolute_import as _abs
+
 _binary_op_cls = None
 
 class BinaryOp(object):
@@ -8,4 +10,17 @@ class BinaryOp(object):
 class AddOp(BinaryOp):
     pass
 
+class SubOp(BinaryOp):
+    pass
+
+class MulOp(BinaryOp):
+    pass
+
+class DivOp(BinaryOp):
+    pass
+
+
 add = AddOp()
+sub = SubOp()
+mul = MulOp()
+div = DivOp()
